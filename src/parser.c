@@ -53,6 +53,10 @@ Token lexer_next(Lexer *l) {
 		advance(l);
 		return (Token) { TOK_DIVIDE, 0 };
 	}
+	if (c == '%') {
+		advance(l);
+		return (Token) { TOK_MODULO, 0 };
+	}
 
 	if (c == ';') {
 		advance(l);
@@ -82,7 +86,7 @@ static int32_t emit_const(IRProgram *p, int32_t value) {
 	return t;
 }
 
-static int32_t emit_arithmetic(IRType type, IRProgram *p, int32_t a, int32_t b) {
+static inline int32_t emit_arithmetic(IRType type, IRProgram *p, int32_t a, int32_t b) {
 	int t = temp_id++;
 
 	p->instructions[p->count++] = (IRInstruction){
@@ -95,23 +99,27 @@ static int32_t emit_arithmetic(IRType type, IRProgram *p, int32_t a, int32_t b) 
 	return t;
 }
 
-static int32_t emit_add(IRProgram *p, int32_t a, int32_t b) {
+static inline int32_t emit_add(IRProgram *p, int32_t a, int32_t b) {
 	return emit_arithmetic(IR_ADD, p, a, b);
 }
 
-static int32_t emit_sub(IRProgram *p, int32_t a, int32_t b) {
+static inline int32_t emit_sub(IRProgram *p, int32_t a, int32_t b) {
 	return emit_arithmetic(IR_SUB, p, a, b);
 }
 
-static int32_t emit_mul(IRProgram *p, int32_t a, int32_t b) {
+static inline int32_t emit_mul(IRProgram *p, int32_t a, int32_t b) {
 	return emit_arithmetic(IR_MUL, p, a, b);
 }
 
-static int32_t emit_div(IRProgram *p, int32_t a, int32_t b) {
+static inline int32_t emit_div(IRProgram *p, int32_t a, int32_t b) {
 	return emit_arithmetic(IR_DIV, p, a, b);
 }
 
-static void next(Parser *p) {
+static inline int32_t emit_mod(IRProgram *p, int32_t a, int32_t b) {
+	return emit_arithmetic(IR_MOD, p, a, b);
+}
+
+static inline void next(Parser *p) {
 	p->current = lexer_next(&p->lex);
 }
 
@@ -129,7 +137,9 @@ static int32_t parse_factor(Parser *p) {
 static int32_t parse_term(Parser *p) {
 	int32_t left = parse_factor(p);
 
-	while (p->current.type == TOK_MULTIPLY || p->current.type == TOK_DIVIDE) {
+	while (p->current.type == TOK_MULTIPLY || 
+	       p->current.type == TOK_DIVIDE ||
+	       p->current.type == TOK_MODULO) {
 		TokenType op = p->current.type;
 		next(p);
 
@@ -137,8 +147,10 @@ static int32_t parse_term(Parser *p) {
 
 		if (op == TOK_MULTIPLY)
 			left = emit_mul(p->out, left, right);
-		else
+		else if (op == TOK_DIVIDE)
 			left = emit_div(p->out, left, right);
+		else
+			left = emit_mod(p->out, left, right);
 	}
 
 	return left;

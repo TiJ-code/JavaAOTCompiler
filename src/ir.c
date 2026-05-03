@@ -40,6 +40,7 @@ bool ir_validate(IRProgram *program) {
 			case IR_SUB:
 			case IR_MUL:
 			case IR_DIV:
+			case IR_MOD:
 			case IR_ADD:
 				if (ins->a.kind != OPERAND_TEMP || ins->b.kind != OPERAND_TEMP) {
 					fprintf(stderr, "IR ERROR: Arithmetic instruction expects temps\n");

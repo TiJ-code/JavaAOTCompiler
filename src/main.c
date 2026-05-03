@@ -89,6 +89,25 @@ static inline void emit_div_reg(CodeBuffer *cb, int32_t dst, int32_t src) {
 	}
 }
 
+static inline void emit_mod_reg(CodeBuffer *cb, int32_t dst, int32_t src) {
+	if (dst != 0) {
+		cb_emit_u8(cb, 0x48);
+		cb_emit_u8(cb, 0x89);
+		cb_emit_u8(cb, 0xC0 | (dst << 3) | 0);
+	}
+
+	cb_emit_u8(cb, 0x48);
+	cb_emit_u8(cb, 0x99);
+
+	cb_emit_u8(cb, 0x48);
+	cb_emit_u8(cb, 0xF7);
+	cb_emit_u8(cb, 0xF8 | src);
+
+	cb_emit_u8(cb, 0x48);
+	cb_emit_u8(cb, 0x89);
+	cb_emit_u8(cb, 0xD0 | (0 << 3) | dst);
+}
+
 int main() {
 	uint8_t storage[1024];
 
@@ -97,7 +116,7 @@ int main() {
 
 	IRProgram prog = {0};
 
-	parse_program(&prog, "return 7 * 2 / 2;");
+	parse_program(&prog, "return 8 % 3;");
 
 	//ir_build_example(&prog);
 
@@ -186,6 +205,19 @@ int main() {
 					     emit_div_reg(&cb, dst, b);
 					     break;
 				     }
+			case IR_MOD: {
+					     int32_t dst = reg_code(ins.destination);
+					     int32_t a   = reg_code(ins.a.as.temp_id);
+					     int32_t b   = reg_code(ins.b.as.temp_id);
+
+					     if (dst != a) {
+						     emit_mov_reg(&cb, dst, a);
+					     }
+
+					     emit_mod_reg(&cb, dst, b);
+					     break;
+				     }
+
 
 
 			case IR_RETURN: {

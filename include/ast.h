@@ -7,6 +7,7 @@ typedef enum {
 	AST_SUB,
 	AST_MUL,
 	AST_DIV,
+	AST_MOD,
 	AST_RETURN
 } ASTType;
 
