@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -Iinclude -Wall -Wextra -Werror -O2
 
-SRC = src/main.c
+SRC = src/main.c src/elf_writer.c
 OUT = compiler
 
 all:
@@ -9,7 +9,7 @@ all:
 
 run: all
 	./$(OUT)
-	./a.out
+	-./a.out
 	echo $$?
 
 clean:
