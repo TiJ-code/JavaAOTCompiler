@@ -8,6 +8,9 @@
 typedef enum {
 	IR_CONST,
 	IR_ADD,
+	IR_SUB,
+	IR_MUL,
+	IR_DIV,
 	IR_RETURN
 } IRType;
 

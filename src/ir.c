@@ -28,29 +28,32 @@ bool ir_validate(IRProgram *program) {
 
 	for (size_t i = 0; i < program->count; i++) {
 		IRInstruction *ins = &program->instructions[i];
-          
-                switch (ins->type) {
-                    case IR_CONST:
-                        if (ins->a.kind != OPERAND_CONST) {
-                            fprintf(stderr, "IR ERROR: CONST expects immediate\n");
-                            return false;
-                        }
-                        break;
-                  
-                    case IR_ADD:
-                        if (ins->a.kind != OPERAND_TEMP || ins->b.kind != OPERAND_TEMP) {
-                            fprintf(stderr, "IR ERROR: ADD expects temps\n");
-                            return false;
-                        }
-                        break;
-                  
-                    case IR_RETURN:
-                        if (ins->a.kind != OPERAND_TEMP) {
-                          fprintf(stderr, "IR ERROR: RETURN expects temp\n");
-                          return false;
-                        }
-                        break;
-                } 
+
+		switch (ins->type) {
+			case IR_CONST:
+				if (ins->a.kind != OPERAND_CONST) {
+					fprintf(stderr, "IR ERROR: CONST expects immediate\n");
+					return false;
+				}
+				break;
+
+			case IR_SUB:
+			case IR_MUL:
+			case IR_DIV:
+			case IR_ADD:
+				if (ins->a.kind != OPERAND_TEMP || ins->b.kind != OPERAND_TEMP) {
+					fprintf(stderr, "IR ERROR: Arithmetic instruction expects temps\n");
+					return false;
+				}
+				break;
+
+			case IR_RETURN:
+				if (ins->a.kind != OPERAND_TEMP) {
+					fprintf(stderr, "IR ERROR: RETURN expects temp\n");
+					return false;
+				}
+				break;
+		} 
 
 		if (ins->a.kind == OPERAND_TEMP) {
 			int32_t t = ins->a.as.temp_id;

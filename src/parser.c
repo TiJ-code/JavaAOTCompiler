@@ -41,6 +41,18 @@ Token lexer_next(Lexer *l) {
 		advance(l);
 		return (Token) { TOK_PLUS, 0 };
 	}
+	if (c == '-') {
+		advance(l);
+		return (Token) { TOK_MINUS, 0 };
+	}
+	if (c == '*') {
+		advance(l);
+		return (Token) { TOK_MULTIPLY, 0 };
+	}
+	if (c == '/') {
+		advance(l);
+		return (Token) { TOK_DIVIDE, 0 };
+	}
 
 	if (c == ';') {
 		advance(l);
@@ -70,17 +82,33 @@ static int32_t emit_const(IRProgram *p, int32_t value) {
 	return t;
 }
 
-static int32_t emit_add(IRProgram *p, int32_t a, int32_t b) {
+static int32_t emit_arithmetic(IRType type, IRProgram *p, int32_t a, int32_t b) {
 	int t = temp_id++;
 
 	p->instructions[p->count++] = (IRInstruction){
-		.type = IR_ADD,
+		.type = type,
 		.a = ir_temp(a),
 		.b = ir_temp(b),
 		.destination = t
 	};
 
 	return t;
+}
+
+static int32_t emit_add(IRProgram *p, int32_t a, int32_t b) {
+	return emit_arithmetic(IR_ADD, p, a, b);
+}
+
+static int32_t emit_sub(IRProgram *p, int32_t a, int32_t b) {
+	return emit_arithmetic(IR_SUB, p, a, b);
+}
+
+static int32_t emit_mul(IRProgram *p, int32_t a, int32_t b) {
+	return emit_arithmetic(IR_MUL, p, a, b);
+}
+
+static int32_t emit_div(IRProgram *p, int32_t a, int32_t b) {
+	return emit_arithmetic(IR_DIV, p, a, b);
 }
 
 static void next(Parser *p) {
@@ -98,13 +126,37 @@ static int32_t parse_factor(Parser *p) {
 	exit(1);
 }
 
-static int32_t parse_expr(Parser *p) {
-	int left = parse_factor(p);
+static int32_t parse_term(Parser *p) {
+	int32_t left = parse_factor(p);
 
-	while (p->current.type == TOK_PLUS) {
+	while (p->current.type == TOK_MULTIPLY || p->current.type == TOK_DIVIDE) {
+		TokenType op = p->current.type;
 		next(p);
+
 		int32_t right = parse_factor(p);
-		left = emit_add(p->out, left, right);
+
+		if (op == TOK_MULTIPLY)
+			left = emit_mul(p->out, left, right);
+		else
+			left = emit_div(p->out, left, right);
+	}
+
+	return left;
+}
+
+static int32_t parse_expr(Parser *p) {
+	int left = parse_term(p);
+
+	while (p->current.type == TOK_PLUS || p->current.type == TOK_MINUS) {
+		TokenType op = p->current.type;
+		next(p);
+
+		int32_t right = parse_term(p);
+
+		if (op == TOK_PLUS)
+			left = emit_add(p->out, left, right);
+		else
+			left = emit_sub(p->out, left, right);
 	}
 
 	return left;
