@@ -44,6 +44,11 @@ int main() {
 	IRProgram prog;
 	ir_build_example(&prog);
 
+	if (!ir_validate(&prog)) {
+		printf("IR invalid\n");
+		return 1;
+	}
+
 	for (size_t i = 0; i < prog.count; i++) {
             IRInstruction ins = prog.instructions[i];
 
@@ -52,14 +57,14 @@ int main() {
             switch (ins.type) {
                 case IR_CONST: {
                         int32_t dst = reg_code(ins.destination); 
-			emit_mov_imm(&cb, dst, ins.a.value);
+			emit_mov_imm(&cb, dst, ins.a.as.value);
 			break;
 			       }
 			
                 case IR_ADD: {
               		int32_t dst = reg_code(ins.destination);
-	      		int32_t a   = reg_code(ins.a.temp_id);
-			int32_t b   = reg_code(ins.b.temp_id);
+	      		int32_t a   = reg_code(ins.a.as.temp_id);
+			int32_t b   = reg_code(ins.b.as.temp_id);
 
 			if (dst == b) {
 				emit_mov_reg(&cb, 10, b);
@@ -75,7 +80,7 @@ int main() {
 			     }
 
                 case IR_RETURN: {
-			int32_t src = reg_code(ins.a.temp_id);
+			int32_t src = reg_code(ins.a.as.temp_id);
 
 			emit_mov_reg(&cb, 7, src);
 
