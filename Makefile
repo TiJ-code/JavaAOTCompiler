@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -Iinclude -Wall -Wextra -Werror -O2
 
-SRC = src/main.c src/elf_writer.c src/codegeneration.c
+SRC = src/main.c src/elf_writer.c src/codegeneration.c src/ir.c
 OUT = compiler
 
 all:
