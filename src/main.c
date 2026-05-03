@@ -4,6 +4,7 @@
 #include "elf_writer.h"
 #include "codegeneration.h"
 #include "ir.h"
+#include "parser.h"
 
 static inline int32_t reg_code(int32_t temp_id) {
 	switch (temp_id) {
@@ -41,8 +42,11 @@ int main() {
 	CodeBuffer cb;
 	cb_init(&cb, storage, sizeof(storage));
 
-	IRProgram prog;
-	ir_build_example(&prog);
+	IRProgram prog = {0};
+
+	parse_program(&prog, "return 60 + 5 + 2;");
+
+	//ir_build_example(&prog);
 
 	if (!ir_validate(&prog)) {
 		printf("IR invalid\n");

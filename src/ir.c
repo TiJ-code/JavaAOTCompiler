@@ -46,7 +46,7 @@ bool ir_validate(IRProgram *program) {
                   
                     case IR_RETURN:
                         if (ins->a.kind != OPERAND_TEMP) {
-                          fprintf("IR ERROR: RETURN expects temp\n");
+                          fprintf(stderr, "IR ERROR: RETURN expects temp\n");
                           return false;
                         }
                         break;
