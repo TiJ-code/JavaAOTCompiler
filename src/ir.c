@@ -10,7 +10,7 @@ void ir_build_example(IRProgram *program) {
 			.is_const = true,
 			.value = 60
 		},
-		.destination = 2
+		.destination = 1
 	};
 
 	// t2 = const 5
