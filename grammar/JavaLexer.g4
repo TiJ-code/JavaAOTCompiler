@@ -176,7 +176,7 @@ fragment FloatTypeSuffix
 	;
 
 CharacterLiteral
-	: '\'' (~['\\\r\n'] | EscapeSequence) '\''
+	: '\'' (~['\\\r\n] | EscapeSequence) '\''
 	;
 
 StringLiteral
@@ -216,3 +216,4 @@ COMMENT
 
 LINE_COMMENT
 	: '//' ~[\r\n]* -> skip
+	;

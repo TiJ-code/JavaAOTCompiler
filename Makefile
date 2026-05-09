@@ -1,16 +1,26 @@
 CC = gcc
+CXX = g++
+
+CXXFLAGS = -std=c++20 -Iinclude -Igenerated -I/usr/include/antlr4-runtime
 CFLAGS = -Iinclude -Wall -Wextra -Werror -O2
 
-SRC = src/main.c src/elf_writer.c src/codegeneration.c src/ir.c src/parser.c
-OUT = compiler
+ANTLR_RUNTIME =-lantlr4-runtime
 
-all:
-	$(CC) $(CFLAGS) $(SRC) -o $(OUT)
+CPP_SOURCES := $(shell find generated src -name '*.cpp')
+C_SOURCES := $(shell find src -name '*.c')
 
-run: all
-	./$(OUT)
-	-./a.out
-	echo $$?
+OBJECTS := $(CPP_SOURCES:.cpp=.o) $(C_SOURCES:.c=.o)
+
+all: compiler
+
+compiler: $(OBJECTS)
+	$(CXX) $(OBJECTS) $(ANTLR_RUNTIME) -o compiler
+
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(OUT) a.out
+	rm -f $(OBJECTS) compiler
