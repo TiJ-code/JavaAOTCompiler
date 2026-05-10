@@ -131,6 +131,8 @@ URSHIFT        : '>>>';
 
 // LITERALS
 
+UNDERSCORE : '_';
+
 IntegerLiteral
 	: DecimalIntegerLiteral
 	;

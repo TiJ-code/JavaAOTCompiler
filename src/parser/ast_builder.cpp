@@ -10,6 +10,8 @@
 #include <any>
 #include <fstream>
 
+#include "JavaParser.h"
+
 using namespace antlr4;
 
 ASTNode *parse_java_file(const char *path) {
@@ -109,53 +111,52 @@ std::any ASTBuilder::visitBlock(JavaParser::BlockContext *ctx) {
 }
 
 std::any ASTBuilder::visitStatement(JavaParser::StatementContext *ctx) {
-	ASTNode *r = ast_create(AST_RETURN);
+    if (ctx->block()) {
+        return visit(ctx->block());
+    }
 
-	if (ctx->RETURN()) {
-		ASTNode *r = ast_create(AST_RETURN);
+    if (ctx->statementExpression()) {
+        return visit(ctx->statementExpression());
+    }
 
-		if (!ctx->expression().empty()) {
-			auto expreCtx = ctx->expression()[0];
+    if (ctx->RETURN()) {
+        ASTNode *r = ast_create(AST_RETURN);
+        if (!ctx->expression().empty()) {
+            auto v = visit(ctx->expression()[0]);
+            if (v.has_value()) {
+                r->left = std::any_cast<ASTNode *>(v);
+            }
+        }
+        return r;
+    }
 
-			r->left = std::any_cast<ASTNode *>(visit(expreCtx));
-		}
-
-		return r;
-	}
-
-	ASTNode *last = nullptr;
-
-	for (auto c : ctx->children) {
-		if (c) {
-			auto v = visit(c);
-			if (v.has_value()) {
-				return v;
-			}
-		}
-	}
-
-	return last;
+    return nullptr;
 }
 
-std::any ASTBuilder::visitBlockStatement( JavaParser::BlockStatementContext *ctx )
+std::any ASTBuilder::visitStatementExpression(JavaParser::StatementExpressionContext *ctx)
 {
-    for (auto c : ctx->children) {
-        if (!c)
-            continue;
+    return visit(ctx->expression());
+}
 
-        auto v = visit(c);
+std::any ASTBuilder::visitBlockStatement(JavaParser::BlockStatementContext *ctx) {
+    if (ctx->localVariableDeclarationStatement()) {
+        return visit(ctx->localVariableDeclarationStatement());
+    }
 
-        if (v.has_value())
-            return v;
+    if (ctx->statement()) {
+        return visit(ctx->statement());
     }
 
     return nullptr;
 }
 
 std::any ASTBuilder::visitExpression(JavaParser::ExpressionContext *ctx) {
-    if (!ctx->children.empty())
-        return visit(ctx->children[0]);
-	return nullptr;
+    return visit(ctx->assignmentExpression());
+}
+
+std::any ASTBuilder::visitExpressionName(JavaParser::ExpressionNameContext *ctx)
+{
+    return ast_identifier(ctx->getText().c_str());
 }
 
 std::any ASTBuilder::visitLocalVariableDeclarationStatement(JavaParser::LocalVariableDeclarationStatementContext *ctx)
@@ -208,18 +209,34 @@ std::any ASTBuilder::visitMultiplicativeExpression(JavaParser::MultiplicativeExp
 
 }
 
+std::any ASTBuilder::visitVariableDeclarator(JavaParser::VariableDeclaratorContext *ctx) {
+    const char* name = ctx->variableDeclaratorId()->getText().c_str();
+    ASTNode* initValue = nullptr;
+
+    if (ctx->variableInitializer()) {
+        initValue = std::any_cast<ASTNode*>(visit(ctx->variableInitializer()));
+    }
+
+    return ast_var_decl(name, initValue);
+}
+
 std::any ASTBuilder::visitAssignmentExpression(JavaParser::AssignmentExpressionContext *ctx) {
-	if (ctx->children.size() == 1)
-		return visit(ctx->children[0]);
+    if (ctx->assignmentOperator()) {
+        ASTNode *node = ast_create(AST_BINARY_OP);
+        node->name = strdup(ctx->assignmentOperator()->getText().c_str());
 
-	ASTNode *node = ast_create(AST_BINARY_OP);
+        if ( const auto lhs = visit(ctx->leftHandSide()); lhs.has_value()) {
+            node->left = std::any_cast<ASTNode *>(lhs);
+        }
 
-	node->left = std::any_cast<ASTNode *>(visit(ctx->children[0]));
-	node->right = std::any_cast<ASTNode *>(visit(ctx->children[2]));
+        if ( const auto rhs = visit(ctx->expression()); rhs.has_value()) {
+            node->right = std::any_cast<ASTNode *>(rhs);
+        }
 
-	node->name = strdup(ctx->children[1]->getText().c_str());
+        return node;
+    }
 
-	return node;
+    return visit(ctx->conditionalExpression());
 }
 
 std::any ASTBuilder::visitLiteral(JavaParser::LiteralContext *ctx) {

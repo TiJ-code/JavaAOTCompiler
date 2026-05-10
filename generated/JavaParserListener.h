@@ -104,6 +104,9 @@ public:
   virtual void enterVariableInitializer(JavaParser::VariableInitializerContext *ctx) = 0;
   virtual void exitVariableInitializer(JavaParser::VariableInitializerContext *ctx) = 0;
 
+  virtual void enterVariableModifier(JavaParser::VariableModifierContext *ctx) = 0;
+  virtual void exitVariableModifier(JavaParser::VariableModifierContext *ctx) = 0;
+
   virtual void enterArrayInitializer(JavaParser::ArrayInitializerContext *ctx) = 0;
   virtual void exitArrayInitializer(JavaParser::ArrayInitializerContext *ctx) = 0;
 
@@ -112,6 +115,9 @@ public:
 
   virtual void enterConstructorDeclaration(JavaParser::ConstructorDeclarationContext *ctx) = 0;
   virtual void exitConstructorDeclaration(JavaParser::ConstructorDeclarationContext *ctx) = 0;
+
+  virtual void enterConstructorModifier(JavaParser::ConstructorModifierContext *ctx) = 0;
+  virtual void exitConstructorModifier(JavaParser::ConstructorModifierContext *ctx) = 0;
 
   virtual void enterThrows_(JavaParser::Throws_Context *ctx) = 0;
   virtual void exitThrows_(JavaParser::Throws_Context *ctx) = 0;
@@ -256,6 +262,9 @@ public:
 
   virtual void enterRelationalExpression(JavaParser::RelationalExpressionContext *ctx) = 0;
   virtual void exitRelationalExpression(JavaParser::RelationalExpressionContext *ctx) = 0;
+
+  virtual void enterPattern(JavaParser::PatternContext *ctx) = 0;
+  virtual void exitPattern(JavaParser::PatternContext *ctx) = 0;
 
   virtual void enterShiftExpression(JavaParser::ShiftExpressionContext *ctx) = 0;
   virtual void exitShiftExpression(JavaParser::ShiftExpressionContext *ctx) = 0;

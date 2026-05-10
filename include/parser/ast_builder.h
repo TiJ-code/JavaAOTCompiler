@@ -22,9 +22,13 @@ public:
 
 	std::any visitStatement(JavaParser::StatementContext *ctx) override;
 
+    std::any visitStatementExpression(JavaParser::StatementExpressionContext *ctx) override;
+
     std::any visitBlockStatement(JavaParser::BlockStatementContext *ctx) override;
 
 	std::any visitExpression(JavaParser::ExpressionContext *ctx) override;
+
+    std::any visitExpressionName(JavaParser::ExpressionNameContext *context) override;
 
     std::any visitLocalVariableDeclarationStatement(JavaParser::LocalVariableDeclarationStatementContext *ctx) override;
 
@@ -33,6 +37,8 @@ public:
 	std::any visitAdditiveExpression(JavaParser::AdditiveExpressionContext *ctx) override;
 
 	std::any visitMultiplicativeExpression(JavaParser::MultiplicativeExpressionContext *ctx) override;
+
+    std::any visitVariableDeclarator(JavaParser::VariableDeclaratorContext *ctx) override;
 
 	std::any visitAssignmentExpression(JavaParser::AssignmentExpressionContext *ctx) override;
 

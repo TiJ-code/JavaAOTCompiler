@@ -7,7 +7,7 @@ options {
 compilationUnit
 	: packageDeclaration?
 	  importDeclaration*
-	  typeDeclaration*
+	  (typeDeclaration | memberDeclaration)*
 	  EOF
 	;
 
@@ -16,7 +16,7 @@ packageDeclaration
 	;
 
 importDeclaration
-	: IMPORT STATIC? qualifiedName (DOT MUL)* SEMI
+	: IMPORT (STATIC | MODULE)? qualifiedName (DOT MUL)* SEMI
 	;
 
 qualifiedName
@@ -158,13 +158,18 @@ variableDeclarator
 	;
 
 variableDeclaratorId
-	: Identifier dims?
+	: (Identifier | UNDERSCORE) dims?
 	;
 
 variableInitializer
 	: expression
 	| arrayInitializer
 	;
+
+variableModifier
+    : annotation
+    | FINAL
+    ;
 
 arrayInitializer
 	: LBRACE
@@ -184,8 +189,15 @@ methodDeclaration
 	;
 
 constructorDeclaration
-	: Identifier formalParameters throws_? methodBody
+	: constructorModifier* Identifier formalParameters throws_? methodBody
 	;
+
+constructorModifier
+    : annotation
+    | PUBLIC
+    | PROTECTED
+    | PRIVATE
+    ;
 
 throws_
 	: THROWS qualifiedNameList
@@ -283,7 +295,7 @@ localVariableDeclarationStatement
 	;
 
 localVariableDeclaration
-	: (typeType | VAR) variableDeclarators
+	: variableModifier* (typeType | VAR) variableDeclarators
 	;
 
 statement
@@ -308,9 +320,8 @@ switchBlock
 	;
 
 switchLabel
-	: CASE expression ARROW statement
-	| CASE expression COLON
-	| DEFAULT COLON
+	: CASE (expression | pattern) (ARROW (statement | block) | COLON)
+	| DEFAULT (ARROW (statement | block) | COLON)
 	;
 
 catchClause
@@ -441,9 +452,13 @@ relationalExpression
 	: shiftExpression
 	  (
 		(LT | GT | LE | GE) shiftExpression
-		| INSTANCEOF shiftExpression
+		| INSTANCEOF (typeType | pattern)
 	  )*
 	;
+
+pattern
+    : typeType variableDeclaratorId
+    ;
 
 shiftExpression
 	: additiveExpression

@@ -135,6 +135,10 @@ public:
     return visitChildren(ctx);
   }
 
+  virtual std::any visitVariableModifier(JavaParser::VariableModifierContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
   virtual std::any visitArrayInitializer(JavaParser::ArrayInitializerContext *ctx) override {
     return visitChildren(ctx);
   }
@@ -144,6 +148,10 @@ public:
   }
 
   virtual std::any visitConstructorDeclaration(JavaParser::ConstructorDeclarationContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
+  virtual std::any visitConstructorModifier(JavaParser::ConstructorModifierContext *ctx) override {
     return visitChildren(ctx);
   }
 
@@ -336,6 +344,10 @@ public:
   }
 
   virtual std::any visitRelationalExpression(JavaParser::RelationalExpressionContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
+  virtual std::any visitPattern(JavaParser::PatternContext *ctx) override {
     return visitChildren(ctx);
   }
 

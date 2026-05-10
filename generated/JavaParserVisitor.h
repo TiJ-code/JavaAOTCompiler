@@ -79,11 +79,15 @@ public:
 
     virtual std::any visitVariableInitializer(JavaParser::VariableInitializerContext *context) = 0;
 
+    virtual std::any visitVariableModifier(JavaParser::VariableModifierContext *context) = 0;
+
     virtual std::any visitArrayInitializer(JavaParser::ArrayInitializerContext *context) = 0;
 
     virtual std::any visitMethodDeclaration(JavaParser::MethodDeclarationContext *context) = 0;
 
     virtual std::any visitConstructorDeclaration(JavaParser::ConstructorDeclarationContext *context) = 0;
+
+    virtual std::any visitConstructorModifier(JavaParser::ConstructorModifierContext *context) = 0;
 
     virtual std::any visitThrows_(JavaParser::Throws_Context *context) = 0;
 
@@ -180,6 +184,8 @@ public:
     virtual std::any visitEqualityExpression(JavaParser::EqualityExpressionContext *context) = 0;
 
     virtual std::any visitRelationalExpression(JavaParser::RelationalExpressionContext *context) = 0;
+
+    virtual std::any visitPattern(JavaParser::PatternContext *context) = 0;
 
     virtual std::any visitShiftExpression(JavaParser::ShiftExpressionContext *context) = 0;
 

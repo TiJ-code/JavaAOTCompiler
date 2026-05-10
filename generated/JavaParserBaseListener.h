@@ -106,6 +106,9 @@ public:
   virtual void enterVariableInitializer(JavaParser::VariableInitializerContext * /*ctx*/) override { }
   virtual void exitVariableInitializer(JavaParser::VariableInitializerContext * /*ctx*/) override { }
 
+  virtual void enterVariableModifier(JavaParser::VariableModifierContext * /*ctx*/) override { }
+  virtual void exitVariableModifier(JavaParser::VariableModifierContext * /*ctx*/) override { }
+
   virtual void enterArrayInitializer(JavaParser::ArrayInitializerContext * /*ctx*/) override { }
   virtual void exitArrayInitializer(JavaParser::ArrayInitializerContext * /*ctx*/) override { }
 
@@ -114,6 +117,9 @@ public:
 
   virtual void enterConstructorDeclaration(JavaParser::ConstructorDeclarationContext * /*ctx*/) override { }
   virtual void exitConstructorDeclaration(JavaParser::ConstructorDeclarationContext * /*ctx*/) override { }
+
+  virtual void enterConstructorModifier(JavaParser::ConstructorModifierContext * /*ctx*/) override { }
+  virtual void exitConstructorModifier(JavaParser::ConstructorModifierContext * /*ctx*/) override { }
 
   virtual void enterThrows_(JavaParser::Throws_Context * /*ctx*/) override { }
   virtual void exitThrows_(JavaParser::Throws_Context * /*ctx*/) override { }
@@ -258,6 +264,9 @@ public:
 
   virtual void enterRelationalExpression(JavaParser::RelationalExpressionContext * /*ctx*/) override { }
   virtual void exitRelationalExpression(JavaParser::RelationalExpressionContext * /*ctx*/) override { }
+
+  virtual void enterPattern(JavaParser::PatternContext * /*ctx*/) override { }
+  virtual void exitPattern(JavaParser::PatternContext * /*ctx*/) override { }
 
   virtual void enterShiftExpression(JavaParser::ShiftExpressionContext * /*ctx*/) override { }
   virtual void exitShiftExpression(JavaParser::ShiftExpressionContext * /*ctx*/) override { }

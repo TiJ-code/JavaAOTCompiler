@@ -33,9 +33,9 @@ public:
     SUB_ASSIGN = 107, MUL_ASSIGN = 108, DIV_ASSIGN = 109, MOD_ASSIGN = 110, 
     AND_ASSIGN = 111, OR_ASSIGN = 112, XOR_ASSIGN = 113, LSHIFT_ASSIGN = 114, 
     RSHIFT_ASSIGN = 115, URSHIFT_ASSIGN = 116, LSHIFT = 117, RSHIFT = 118, 
-    URSHIFT = 119, IntegerLiteral = 120, FloatingPointLiteral = 121, CharacterLiteral = 122, 
-    StringLiteral = 123, TextBlock = 124, Identifier = 125, WS = 126, COMMENT = 127, 
-    LINE_COMMENT = 128
+    URSHIFT = 119, UNDERSCORE = 120, IntegerLiteral = 121, FloatingPointLiteral = 122, 
+    CharacterLiteral = 123, StringLiteral = 124, TextBlock = 125, Identifier = 126, 
+    WS = 127, COMMENT = 128, LINE_COMMENT = 129
   };
 
   explicit JavaLexer(antlr4::CharStream *input);
