@@ -1,3 +1,5 @@
-int main() {
-	return 60 + 5;
+public class Main {
+	public int add() {
+		return 40 + 2;
+	}
 }

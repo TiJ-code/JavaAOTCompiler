@@ -3,6 +3,8 @@
 #ifndef _PARSER_H
 #define _PARSER_H
 
-void parse_jar_file();
+#include "ast/ast.h"
+
+ASTNode *parse_java_file(const char *path);
 
 #endif
