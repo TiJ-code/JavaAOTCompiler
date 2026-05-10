@@ -1,5 +1,6 @@
 public class Main {
 	public int add() {
-		return 40 + 2;
+		int x = 40 + 2;
+		return x;
 	}
 }

@@ -10,46 +10,51 @@
 extern "C" {
 #endif
 
-typedef enum {
-	AST_PROGRAM,
+	typedef enum {
+		AST_PROGRAM,
 
-	AST_CLASS_DECL,
-	AST_METHOD_DECL,
-	AST_BLOCK,
-	AST_RETURN,
+		AST_CLASS_DECL,
+		AST_METHOD_DECL,
+		AST_BLOCK,
+		AST_RETURN,
 
-	AST_LITERAL,
-	AST_IDENTIFIER,
-	AST_BINARY_OP
-} ASTType;
+		AST_VAR_DECL,
 
-typedef struct ASTNode ASTNode;
+		AST_LITERAL,
+		AST_IDENTIFIER,
+		AST_BINARY_OP
+	} ASTType;
 
-typedef struct ASTList {
-	ASTNode** items;
-	size_t count;
-	size_t capacity;
-} ASTList;
+	typedef struct ASTNode ASTNode;
 
-struct ASTNode {
-	ASTType type;
-	const char *name;
+	typedef struct ASTList {
+		ASTNode** items;
+		size_t count;
+		size_t capacity;
+	} ASTList;
 
-	int32_t int_value;
+	struct ASTNode {
+		ASTType type;
+		const char *name;
 
-	struct ASTNode *left;
-	struct ASTNode *right;
+		int32_t int_value;
 
-    ASTList *children;
-};
+		struct ASTNode *left;
+		struct ASTNode *right;
 
-ASTNode *ast_create(ASTType kind);
-void ast_add_child(ASTNode *parent, ASTNode *child);
+		ASTList *children;
 
-ASTNode *ast_int(int32_t value);
-ASTNode *ast_identifier(const char *name);
+		struct ASTNode *value;
+	};
 
-void ast_print(ASTNode *node, int32_t indent);
+	ASTNode *ast_create(ASTType kind);
+	void ast_add_child(ASTNode *parent, ASTNode *child);
+
+	ASTNode *ast_var_decl(const char *name, ASTNode *value);
+	ASTNode *ast_int(int32_t value);
+	ASTNode *ast_identifier(const char *name);
+
+	void ast_print(ASTNode *node, int32_t indent);
 
 #ifdef __cplusplus
 }

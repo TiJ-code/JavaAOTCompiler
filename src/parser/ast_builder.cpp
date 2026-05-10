@@ -5,6 +5,7 @@
 #include "antlr4-runtime.h"
 
 #include "parser/ast_builder.h"
+#include "semantic/symbol_table.h"
 
 #include <any>
 #include <fstream>
@@ -125,11 +126,10 @@ std::any ASTBuilder::visitStatement(JavaParser::StatementContext *ctx) {
 	ASTNode *last = nullptr;
 
 	for (auto c : ctx->children) {
-		auto v = visit(c);
-		if (v.has_value()) {
-			try {
-				last = std::any_cast<ASTNode *>(v);
-			} catch (...) {
+		if (c) {
+			auto v = visit(c);
+			if (v.has_value()) {
+				return v;
 			}
 		}
 	}
@@ -137,9 +137,44 @@ std::any ASTBuilder::visitStatement(JavaParser::StatementContext *ctx) {
 	return last;
 }
 
+std::any ASTBuilder::visitBlockStatement( JavaParser::BlockStatementContext *ctx )
+{
+    for (auto c : ctx->children) {
+        if (!c)
+            continue;
+
+        auto v = visit(c);
+
+        if (v.has_value())
+            return v;
+    }
+
+    return nullptr;
+}
+
 std::any ASTBuilder::visitExpression(JavaParser::ExpressionContext *ctx) {
-	return visitChildren(ctx);
-	//  return visit(ctx->assignmentExpression());
+    if (!ctx->children.empty())
+        return visit(ctx->children[0]);
+	return nullptr;
+}
+
+std::any ASTBuilder::visitLocalVariableDeclarationStatement(JavaParser::LocalVariableDeclarationStatementContext *ctx)
+{
+    return visit(ctx->localVariableDeclaration());
+}
+
+std::any ASTBuilder::visitLocalVariableDeclaration(JavaParser::LocalVariableDeclarationContext *ctx) {
+    ASTNode *last = nullptr;
+
+    for (auto v : ctx->variableDeclarators()->variableDeclarator()) {
+        auto result = visit(v);
+
+        if (result.has_value()) {
+            last = std::any_cast<ASTNode *>(result);
+        }
+    }
+
+    return last;
 }
 
 std::any ASTBuilder::visitAdditiveExpression(JavaParser::AdditiveExpressionContext *ctx) {
@@ -193,4 +228,19 @@ std::any ASTBuilder::visitLiteral(JavaParser::LiteralContext *ctx) {
 	}
 
 	return nullptr;
+}
+
+std::any ASTBuilder::visitPrimary( JavaParser::PrimaryContext *ctx )
+{
+    if (ctx->expressionName())
+    {
+        return ast_identifier(ctx->getText().c_str());
+    }
+
+    if (ctx->literal())
+    {
+        return visit(ctx->literal());
+    }
+
+    return visitChildren(ctx);
 }

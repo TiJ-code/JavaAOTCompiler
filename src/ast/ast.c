@@ -30,6 +30,12 @@ ASTNode *ast_create(ASTType type) {
 	return n;
 }
 
+ASTNode *ast_var_decl(const char *name, ASTNode *value) {
+	ASTNode *n = ast_create(AST_VAR_DECL);
+	n->name    = strdup(name);
+	n->value   = value;
+	return n;
+}
 
 void ast_add_child(ASTNode *parent, ASTNode *child) {
     list_add(parent->children, child);
@@ -63,11 +69,16 @@ void ast_print(ASTNode *node, int32_t indent) {
 		case AST_CLASS_DECL:  printf("CLASS %s\n", node->name ? node->name : "");  break;
 		case AST_METHOD_DECL: printf("METHOD %s\n", node->name ? node->name : ""); break;
 		case AST_BLOCK:       printf("BLOCK\n");                                   break;
+		case AST_VAR_DECL:    printf("VAR %s\n", node->name ? node->name : "");    break;
 		case AST_RETURN:      printf("RETURN\n");                                  break;
 		case AST_LITERAL:     printf("LITERAL %d\n", node->int_value);             break;
 		case AST_IDENTIFIER:  printf("IDENT %s\n", node->name ? node->name : "");  break;
 		case AST_BINARY_OP:   printf("BINOP %s\n", node->name ? node->name : "");  break;
-		default:              printf("UNKOWN\n");                                  break;
+		default:              printf("UNKNOWN\n");                                  break;
+	}
+
+	if (node->value) {
+		ast_print(node->value, indent+1);
 	}
 
 	if (node->left) {
