@@ -28,31 +28,35 @@ extern "C" {
 	typedef struct ASTNode ASTNode;
 
 	typedef struct ASTList {
-		ASTNode** items;
+		ASTNode **items;
 		size_t count;
 		size_t capacity;
 	} ASTList;
 
+    typedef union ASTValue
+    {
+        int32_t int_value;
+        char *str;
+        char *op;
+    } ASTValue;
+
 	struct ASTNode {
 		ASTType type;
-		const char *name;
 
-		int32_t int_value;
-
-		struct ASTNode *left;
-		struct ASTNode *right;
+	    ASTValue value;
 
 		ASTList *children;
 
-		struct ASTNode *value;
+		int scope_level;
 	};
 
-	ASTNode *ast_create(ASTType kind);
-	void ast_add_child(ASTNode *parent, ASTNode *child);
+    ASTNode *ast_new_node(ASTType type);
 
-	ASTNode *ast_var_decl(const char *name, ASTNode *value);
-	ASTNode *ast_int(int32_t value);
-	ASTNode *ast_identifier(const char *name);
+    ASTNode *ast_new_int(int32_t value);
+    ASTNode *ast_new_ident(const char *name);
+    ASTNode *ast_new_op(const char *op);
+
+    void ast_add_child(ASTNode *parent, ASTNode *child);
 
 	void ast_print(ASTNode *node, int32_t indent);
 

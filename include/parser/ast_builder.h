@@ -11,6 +11,7 @@ class ASTBuilder : public JavaParserBaseVisitor {
 public:
 	ASTNode *root = nullptr;
 	SymbolTable symbols;
+    int current_scope = 0;
 
 	std::any visitCompilationUnit(JavaParser::CompilationUnitContext *ctx) override;
 

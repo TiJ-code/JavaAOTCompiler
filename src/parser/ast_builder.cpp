@@ -10,9 +10,19 @@
 #include <any>
 #include <fstream>
 
-#include "JavaParser.h"
-
 using namespace antlr4;
+
+static ASTNode *to_node( const std::any &a )
+{
+    try
+    {
+        return std::any_cast<ASTNode *>(a);
+    }
+    catch (...)
+    {
+        return nullptr;
+    }
+}
 
 ASTNode *parse_java_file(const char *path) {
 	std::ifstream file(path);
@@ -39,93 +49,71 @@ ASTNode *parse_java_file(const char *path) {
 }
 
 std::any ASTBuilder::visitCompilationUnit(JavaParser::CompilationUnitContext *ctx) {
-	ASTNode *program = ast_create(AST_PROGRAM);
+	ASTNode *program = ast_new_node(AST_PROGRAM);
 	root = program;
 
 	for (auto t : ctx->typeDeclaration()) {
-		try {
-			auto v = visit(t);
-
-			if (v.has_value()) {
-				ASTNode *child = std::any_cast<ASTNode *>(v);
-				if (child)
-					ast_add_child(program, child);
-			}
-		} catch (...) {}
+        if (ASTNode *n = to_node(visit(t)))
+	        ast_add_child(program, n);
 	}
 
 	return program;
 }
 
 std::any ASTBuilder::visitClassDeclaration(JavaParser::ClassDeclarationContext *ctx) {
-	ASTNode *cls = ast_create(AST_CLASS_DECL);
-	cls->name = strdup(ctx->Identifier()->getText().c_str());
+	ASTNode *cls = ast_new_node(AST_CLASS_DECL);
+	cls->value.str = strdup(ctx->Identifier()->getText().c_str());
 
 	for (auto m : ctx->classBody()->classBodyDeclaration()) {
-		try {
-			auto v = visit(m);
-
-			if (v.has_value()) {
-				ASTNode *child = std::any_cast<ASTNode *>(v);
-				if (child)
-					ast_add_child(cls, child);
-			}
-		} catch (...) {}
+        if (ASTNode *n = to_node(visit(m)))
+	        ast_add_child(cls, n);
 	}
 
 	return cls;
 }
 
 std::any ASTBuilder::visitMethodDeclaration(JavaParser::MethodDeclarationContext *ctx) {
-	ASTNode *m = ast_create(AST_METHOD_DECL);
+	ASTNode *m = ast_new_node(AST_METHOD_DECL);
 
-	auto id = ctx->Identifier();
-
-	if (id)
-		m->name = strdup(id->getText().c_str());
+	if (ctx->Identifier())
+		m->value.str = strdup(ctx->Identifier()->getText().c_str());
 
 	if (ctx->methodBody() && ctx->methodBody()->block()) {
-		m->left = std::any_cast<ASTNode *>(visit(ctx->methodBody()->block()));
+        if (ASTNode *body = to_node(visit(ctx->methodBody()->block())))
+	        ast_add_child(m, body);
 	}
 
 	return m;
 }
 
 std::any ASTBuilder::visitBlock(JavaParser::BlockContext *ctx) {
-	ASTNode *b = ast_create(AST_BLOCK);
+	ASTNode *b = ast_new_node(AST_BLOCK);
+
+    b->scope_level = current_scope++;
 
 	for (auto s : ctx->blockStatement()) {
-		try {
-			auto v = visit(s);
-
-			if (v.has_value()) {
-				ASTNode *child = std::any_cast<ASTNode *>(v);
-
-				if (child)
-					ast_add_child(b, child);
-			}
-		} catch (...) {}
+	    if (ASTNode *n = to_node(visit(s)))
+	        ast_add_child(b, n);
 	}
+
+    current_scope--;
 
 	return b;
 }
 
 std::any ASTBuilder::visitStatement(JavaParser::StatementContext *ctx) {
-    if (ctx->block()) {
+    if (ctx->block())
         return visit(ctx->block());
-    }
 
-    if (ctx->statementExpression()) {
+    if (ctx->statementExpression())
         return visit(ctx->statementExpression());
-    }
 
     if (ctx->RETURN()) {
-        ASTNode *r = ast_create(AST_RETURN);
+        ASTNode *r = ast_new_node(AST_RETURN);
+
         if (!ctx->expression().empty()) {
-            auto v = visit(ctx->expression()[0]);
-            if (v.has_value()) {
-                r->left = std::any_cast<ASTNode *>(v);
-            }
+            if (ASTNode *expr = to_node(visit(ctx->expression()[0])))
+                ast_add_child(r, expr);
         }
         return r;
     }
@@ -139,13 +127,11 @@ std::any ASTBuilder::visitStatementExpression(JavaParser::StatementExpressionCon
 }
 
 std::any ASTBuilder::visitBlockStatement(JavaParser::BlockStatementContext *ctx) {
-    if (ctx->localVariableDeclarationStatement()) {
+    if (ctx->localVariableDeclarationStatement())
         return visit(ctx->localVariableDeclarationStatement());
-    }
 
-    if (ctx->statement()) {
+    if (ctx->statement())
         return visit(ctx->statement());
-    }
 
     return nullptr;
 }
@@ -156,7 +142,7 @@ std::any ASTBuilder::visitExpression(JavaParser::ExpressionContext *ctx) {
 
 std::any ASTBuilder::visitExpressionName(JavaParser::ExpressionNameContext *ctx)
 {
-    return ast_identifier(ctx->getText().c_str());
+    return ast_new_ident(ctx->getText().c_str());
 }
 
 std::any ASTBuilder::visitLocalVariableDeclarationStatement(JavaParser::LocalVariableDeclarationStatementContext *ctx)
@@ -167,97 +153,84 @@ std::any ASTBuilder::visitLocalVariableDeclarationStatement(JavaParser::LocalVar
 std::any ASTBuilder::visitLocalVariableDeclaration(JavaParser::LocalVariableDeclarationContext *ctx) {
     ASTNode *last = nullptr;
 
-    for (auto v : ctx->variableDeclarators()->variableDeclarator()) {
-        auto result = visit(v);
-
-        if (result.has_value()) {
-            last = std::any_cast<ASTNode *>(result);
-        }
+    for (auto v : ctx->variableDeclarators()->variableDeclarator())
+    {
+        if (ASTNode *n = to_node(visit(v)))
+            last = n;
     }
 
     return last;
 }
 
 std::any ASTBuilder::visitAdditiveExpression(JavaParser::AdditiveExpressionContext *ctx) {
-	if (ctx->children.size() == 1)
-		return visit(ctx->children[0]);
+    if (ctx->children.size() == 1)
+        return visit(ctx->children[0]);
 
-	ASTNode *node = ast_create(AST_BINARY_OP);
+    ASTNode *node = ast_new_op(ctx->children[1]->getText().c_str());
 
-	node->left = std::any_cast<ASTNode *>(visit(ctx->children[0]));
+    ast_add_child(node, to_node(visit(ctx->children[0])));
+    ast_add_child(node, to_node(visit(ctx->children[2])));
 
-	node->name = strdup(ctx->children[1]->getText().c_str());
-
-	node->right = std::any_cast<ASTNode *>(visit(ctx->children[2]));
-
-	return node;
+    return node;
 }
 
 std::any ASTBuilder::visitMultiplicativeExpression(JavaParser::MultiplicativeExpressionContext *ctx) {
-	if (ctx->children.size() == 1)
-		return visit(ctx->children[0]);
+    if (ctx->children.size() == 1)
+        return visit(ctx->children[0]);
 
-	ASTNode *node = ast_create(AST_BINARY_OP);
+    ASTNode *node = ast_new_op(ctx->children[1]->getText().c_str());
 
-	node->left = std::any_cast<ASTNode *>(visit(ctx->children[0]));
+    ast_add_child(node, to_node(visit(ctx->children[0])));
+    ast_add_child(node, to_node(visit(ctx->children[2])));
 
-	node->name = strdup(ctx->children[1]->getText().c_str());
-
-	node->right = std::any_cast<ASTNode *>(visit(ctx->children[2]));
-
-	return node;
-
+    return node;
 }
 
 std::any ASTBuilder::visitVariableDeclarator(JavaParser::VariableDeclaratorContext *ctx) {
-    const char* name = ctx->variableDeclaratorId()->getText().c_str();
-    ASTNode* initValue = nullptr;
+    ASTNode *n = ast_new_node(AST_VAR_DECL);
 
-    if (ctx->variableInitializer()) {
-        initValue = std::any_cast<ASTNode*>(visit(ctx->variableInitializer()));
+    n->value.str = strdup(ctx->variableDeclaratorId()->getText().c_str());
+
+    if (ctx->variableInitializer())
+    {
+        if (ASTNode *init = to_node(visit(ctx->variableInitializer())))
+            ast_add_child(n, init);
     }
 
-    return ast_var_decl(name, initValue);
+    return n;
 }
 
 std::any ASTBuilder::visitAssignmentExpression(JavaParser::AssignmentExpressionContext *ctx) {
-    if (ctx->assignmentOperator()) {
-        ASTNode *node = ast_create(AST_BINARY_OP);
-        node->name = strdup(ctx->assignmentOperator()->getText().c_str());
+    if (!ctx->assignmentOperator())
+        return visit(ctx->conditionalExpression());
 
-        if ( const auto lhs = visit(ctx->leftHandSide()); lhs.has_value()) {
-            node->left = std::any_cast<ASTNode *>(lhs);
-        }
+    ASTNode *node = ast_new_node(AST_BINARY_OP);
 
-        if ( const auto rhs = visit(ctx->expression()); rhs.has_value()) {
-            node->right = std::any_cast<ASTNode *>(rhs);
-        }
+    node->value.op = strdup(ctx->assignmentOperator()->getText().c_str());
 
-        return node;
-    }
+    ASTNode *lhs = to_node(visit(ctx->leftHandSide()));
+    ASTNode *rhs = to_node(visit(ctx->expression()));
 
-    return visit(ctx->conditionalExpression());
+    if (lhs) ast_add_child(node, lhs);
+    if (rhs) ast_add_child(node, rhs);
+
+    return node;
 }
 
 std::any ASTBuilder::visitLiteral(JavaParser::LiteralContext *ctx) {
-	if (ctx->IntegerLiteral()) {
-		return ast_int(std::stoi(ctx->getText()));
-	}
+    if (ctx->IntegerLiteral())
+        return ast_new_int(std::stoi(ctx->getText()));
 
-	return nullptr;
+    return nullptr;
 }
 
 std::any ASTBuilder::visitPrimary( JavaParser::PrimaryContext *ctx )
 {
     if (ctx->expressionName())
-    {
-        return ast_identifier(ctx->getText().c_str());
-    }
+        return ast_new_ident(ctx->getText().c_str());
 
     if (ctx->literal())
-    {
         return visit(ctx->literal());
-    }
 
     return visitChildren(ctx);
 }
