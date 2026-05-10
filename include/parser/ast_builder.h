@@ -22,6 +22,12 @@ public:
 
 	virtual std::any visitExpression(JavaParser::ExpressionContext *ctx) override;
 
+	virtual std::any visitAdditiveExpression(JavaParser::AdditiveExpressionContext *ctx) override;
+
+	virtual std::any visitMultiplicativeExpression(JavaParser::MultiplicativeExpressionContext *ctx) override;
+
+	virtual std::any visitAssignmentExpression(JavaParser::AssignmentExpressionContext *ctx) override;
+
 	virtual std::any visitLiteral(JavaParser::LiteralContext *ctx) override;
 };
 

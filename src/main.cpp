@@ -16,6 +16,7 @@ int main(int argc, char **argv) {
 	}
 
 	printf("Parsed successfully\n");
+	ast_print(root, 0);
 
 	return 0;
 }

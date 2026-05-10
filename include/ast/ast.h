@@ -15,18 +15,13 @@ typedef enum {
 
 	AST_CLASS_DECL,
 	AST_METHOD_DECL,
-	AST_PARAM,
-
 	AST_BLOCK,
 	AST_RETURN,
 
-	AST_VAR_DECL,
-
-	AST_BINARY_EXPR,
-	AST_CALL_EXPR,
-	AST_LITERAL_INT,
-	AST_IDENTIFIER
-} ASTKind;
+	AST_LITERAL,
+	AST_IDENTIFIER,
+	AST_BINARY_OP
+} ASTType;
 
 typedef struct ASTNode ASTNode;
 
@@ -37,23 +32,24 @@ typedef struct ASTList {
 } ASTList;
 
 struct ASTNode {
-	ASTKind kind;
-
+	ASTType type;
 	const char *name;
-
-	ASTList children;
 
 	int32_t int_value;
 
-	ASTNode *left;
-	ASTNode *right;
+	struct ASTNode *left;
+	struct ASTNode *right;
+
+    ASTList *children;
 };
 
-ASTNode *ast_create(ASTKind kind);
+ASTNode *ast_create(ASTType kind);
 void ast_add_child(ASTNode *parent, ASTNode *child);
 
 ASTNode *ast_int(int32_t value);
 ASTNode *ast_identifier(const char *name);
+
+void ast_print(ASTNode *node, int32_t indent);
 
 #ifdef __cplusplus
 }
