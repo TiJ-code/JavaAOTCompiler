@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include "ast/ast.h"
+#include "semantic/analyzer.h"
+#include "semantic/symbol_table.h"
 #include "parser/parser.h"
 
 int main(int argc, char **argv) {
@@ -16,7 +18,14 @@ int main(int argc, char **argv) {
 	}
 
 	printf("Parsed successfully\n");
+
+	SymbolTable table;
+	symbol_table_init(&table);
+
+	semantic_analyze(root, &table);
 	ast_print(root, 0);
+
+	symbol_table_free(&table);
 
 	return 0;
 }

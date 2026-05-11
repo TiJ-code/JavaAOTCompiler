@@ -3,7 +3,7 @@ public class Main {
 		int x;
 		{
 		    {
-		        x = 40;
+		        y = 40;
 		    }
 		    x = x + 1;
 		}
