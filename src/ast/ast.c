@@ -3,6 +3,18 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+static const char *type_name(Type *type) {
+	if (!type)
+		return "null";
+
+	switch (type->kind) {
+		case TYPE_INT:     return "int";
+		case TYPE_VOID:    return "void";
+		case TYPE_UNKNOWN:
+		default:           return "unknown";
+	}
+}
+
 static void list_add(ASTList *list, ASTNode *node) {
 	if (list->count >= list->capacity) {
 		list->capacity *= 2;
@@ -16,12 +28,15 @@ ASTNode *ast_new_node(ASTType type)
     ASTNode *n = calloc(1, sizeof(ASTNode));
     n->type = type;
 
-    n->children = malloc(sizeof(ASTList));
-    n->children->count = 0;
+    n->children           = malloc(sizeof(ASTList));
+    n->children->count    = 0;
     n->children->capacity = 4;
-    n->children->items = malloc(sizeof(ASTNode*) * 4);
+    n->children->items    = malloc(sizeof(ASTNode*) * 4);
 
     n->scope_level = 0;
+
+		n->resolved_type = NULL;
+		n->decl_type     = NULL;
 
     return n;
 }
@@ -60,11 +75,26 @@ void ast_print(ASTNode *node, int indent) {
         case AST_CLASS_DECL:  printf("CLASS %s\n", node->value.str ? node->value.str : ""); break;
         case AST_METHOD_DECL: printf("METHOD %s\n", node->value.str ? node->value.str : ""); break;
         case AST_BLOCK:       printf("BLOCK (scope=%d)\n", node->scope_level); break;
-        case AST_VAR_DECL:    printf("VAR %s\n", node->value.str ? node->value.str : ""); break;
+				case AST_VAR_DECL:
+					printf("VAR %s : %s\n", 
+							node->value.str ? node->value.str : "",
+							node->decl_type ? node->decl_type : "unknown"
+					); 
+					break;
         case AST_RETURN:      printf("RETURN\n"); break;
-        case AST_LITERAL:     printf("LITERAL %d\n", node->value.int_value); break;
+        case AST_LITERAL:
+					printf("LITERAL %d <%s>\n", 
+							node->value.int_value,
+							type_name(node->resolved_type)
+					); 
+					break;
         case AST_IDENTIFIER:  printf("IDENT %s\n", node->value.str ? node->value.str : ""); break;
-        case AST_BINARY_OP:   printf("BINOP %s\n", node->value.op ? node->value.op : ""); break;
+				case AST_BINARY_OP:
+					printf("BINOP %s <%s>\n",
+							node->value.op ? node->value.op : "",
+							type_name(node->resolved_type)
+					); 
+					break;
         default:              printf("UNKNOWN\n"); break;
     }
 

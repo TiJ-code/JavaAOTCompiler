@@ -6,6 +6,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "semantic/type.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -33,30 +35,34 @@ extern "C" {
 		size_t capacity;
 	} ASTList;
 
-    typedef union ASTValue
-    {
-        int32_t int_value;
-        char *str;
-        char *op;
-    } ASTValue;
+	typedef union ASTValue
+	{
+		int32_t int_value;
+		char *str;
+		char *op;
+	} ASTValue;
 
 	struct ASTNode {
 		ASTType type;
 
-	    ASTValue value;
+		ASTValue value;
 
 		ASTList *children;
 
-		int scope_level;
+		int32_t scope_level;
+
+		Type *resolved_type;
+
+		char *decl_type;
 	};
 
-    ASTNode *ast_new_node(ASTType type);
+	ASTNode *ast_new_node(ASTType type);
 
-    ASTNode *ast_new_int(int32_t value);
-    ASTNode *ast_new_ident(const char *name);
-    ASTNode *ast_new_op(const char *op);
+	ASTNode *ast_new_int(int32_t value);
+	ASTNode *ast_new_ident(const char *name);
+	ASTNode *ast_new_op(const char *op);
 
-    void ast_add_child(ASTNode *parent, ASTNode *child);
+	void ast_add_child(ASTNode *parent, ASTNode *child);
 
 	void ast_print(ASTNode *node, int32_t indent);
 

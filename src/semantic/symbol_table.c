@@ -15,24 +15,25 @@ static inline void symbol_table_resize(SymbolTable *table) {
 static inline void scope_resize(Scope *scope) {
 	if (scope->count >= scope->capacity) {
 		scope->capacity *= 2;
-		scope->symbols = realloc(
+		scope->symbols   = realloc(
 				scope->symbols,
 				sizeof(Symbol) * scope->capacity
 				);
 	}
 }
 
-static void scope_add_symbol(Scope *scope, const char *name, int32_t level) {
+static void scope_add_symbol(Scope *scope, const char *name, Type *type, int32_t level) {
 	scope_resize(scope);
 
-	scope->symbols[scope->count].name = strdup(name);
+	scope->symbols[scope->count].name        = strdup(name);
+	scope->symbols[scope->count].type        = type;
 	scope->symbols[scope->count].scope_level = level;
 
 	scope->count++;
 }
 
 void symbol_table_init(SymbolTable *table) {
-	table->scope_count = 0;
+	table->scope_count    = 0;
 	table->scope_capacity = 4;
 
 	table->scopes = malloc(sizeof(Scope) * table->scope_capacity);
@@ -72,7 +73,7 @@ void symbol_table_pop_scope(SymbolTable *table)  {
 	table->scope_count--;
 }
 
-bool symbol_table_define(SymbolTable *table, const char *name) {
+bool symbol_table_define(SymbolTable *table, const char *name, Type *type) {
 	if (table->scope_count == 0)
 		symbol_table_push_scope(table);
 
@@ -83,7 +84,7 @@ bool symbol_table_define(SymbolTable *table, const char *name) {
 			return false;
 	}
 
-	scope_add_symbol(scope, name, (int32_t)table->scope_count - 1);
+	scope_add_symbol(scope, name, type, (int32_t)table->scope_count - 1);
 
 	return true;
 }

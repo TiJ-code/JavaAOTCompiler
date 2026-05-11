@@ -152,11 +152,15 @@ std::any ASTBuilder::visitLocalVariableDeclarationStatement(JavaParser::LocalVar
 
 std::any ASTBuilder::visitLocalVariableDeclaration(JavaParser::LocalVariableDeclarationContext *ctx) {
     ASTNode *last = nullptr;
+    
+    std::string type_name = ctx->typeType()->getText();
 
     for (auto v : ctx->variableDeclarators()->variableDeclarator())
     {
-        if (ASTNode *n = to_node(visit(v)))
+        if (ASTNode *n = to_node(visit(v))) {
+            n->decl_type = strdup(type_name.c_str());
             last = n;
+        }
     }
 
     return last;
