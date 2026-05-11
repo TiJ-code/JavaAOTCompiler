@@ -3,18 +3,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-static const char *type_name(Type *type) {
-	if (!type)
-		return "null";
-
-	switch (type->kind) {
-		case TYPE_INT:     return "int";
-		case TYPE_VOID:    return "void";
-		case TYPE_UNKNOWN:
-		default:           return "unknown";
-	}
-}
-
 static void list_add(ASTList *list, ASTNode *node) {
 	if (list->count >= list->capacity) {
 		list->capacity *= 2;

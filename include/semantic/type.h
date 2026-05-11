@@ -20,4 +20,12 @@ extern Type TYPE_INT_OBJ;
 extern Type TYPE_VOID_OBJ;
 extern Type TYPE_UNKNOWN_OBJ;
 
+static inline const char *type_name(Type *t) {
+	switch (t->kind) {
+		case TYPE_INT:  return "int";
+		case TYPE_VOID: return "void";
+		default:        return "unknown";
+	}
+}
+
 #endif

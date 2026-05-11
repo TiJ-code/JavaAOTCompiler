@@ -1,6 +1,6 @@
 public class Main {
 	public int add() {
-		int x;
+/*		int x;
 		{
 		    {
 		        x = 40;
@@ -8,6 +8,7 @@ public class Main {
 		    x = x + 1;
 		}
 		x += 1;
-		return x;
+		return x;*/
+		return 42;
 	}
 }

@@ -3,6 +3,8 @@
 #include "semantic/analyzer.h"
 #include "semantic/symbol_table.h"
 #include "parser/parser.h"
+#include "ir/ir_builder.h"
+#include "codegen/x86.h"
 
 int main(int argc, char **argv) {
 	if (argc < 2) {
@@ -24,6 +26,17 @@ int main(int argc, char **argv) {
 
 	semantic_analyze(root, &table);
 	ast_print(root, 0);
+
+	IRFunction ir;
+	ir_lower(root, &ir, &table);
+
+	FILE *out = fopen("out.s", "w");
+	x86_generate(&ir, out);
+	fclose(out);
+
+	ir_free(&ir);
+
+	printf("Code generation complete: out.s");
 
 	symbol_table_free(&table);
 

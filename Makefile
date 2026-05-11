@@ -1,4 +1,4 @@
-MAKEFLAGS := --jobs=6
+MAKEFLAGS := --jobs=16
 
 CC = gcc
 CXX = g++
