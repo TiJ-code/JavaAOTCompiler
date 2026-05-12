@@ -1,4 +1,5 @@
 .global main
 main:
- mov $42, %rax
+   # TODO load variable x properly
+ mov $0, %rax
  ret

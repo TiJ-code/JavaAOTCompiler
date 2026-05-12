@@ -23,7 +23,7 @@ static Type *infer_expression_type(ASTNode *node, SymbolTable *table)
 		case AST_IDENTIFIER:
 		{
 			if (symbol_table_exists(table, node->value.str))
-				return &TYPE_INT_OBJ;
+				return node->resolved_type;
 			return &TYPE_UNKNOWN_OBJ;
 		}
 
@@ -35,10 +35,24 @@ static Type *infer_expression_type(ASTNode *node, SymbolTable *table)
 			Type *l = infer_expression_type(lhs, table);
 			Type *r = infer_expression_type(rhs, table);
 
-			if (l == &TYPE_INT_OBJ && r == &TYPE_INT_OBJ)
-			{
+			if (l == &TYPE_LONG_OBJ && r == &TYPE_LONG_OBJ) {
+				node->resolved_type = &TYPE_LONG_OBJ;
+				return &TYPE_LONG_OBJ;
+			}
+
+			if (l == &TYPE_INT_OBJ && r == &TYPE_INT_OBJ) {
 				node->resolved_type = &TYPE_INT_OBJ;
 				return &TYPE_INT_OBJ;
+			}
+
+			if (l == &TYPE_BYTE_OBJ && r == &TYPE_SHORT_OBJ) {
+				node->resolved_type = &TYPE_BYTE_OBJ;
+				return &TYPE_BYTE_OBJ;
+			}
+			
+			if (l == &TYPE_BYTE_OBJ && r == &TYPE_BYTE_OBJ) {
+				node->resolved_type = &TYPE_BYTE_OBJ;
+				return &TYPE_BYTE_OBJ;
 			}
 
 			node->resolved_type = &TYPE_UNKNOWN_OBJ;
@@ -68,8 +82,14 @@ static void analyze_var_decl(ASTNode *node, SymbolTable *table) {
 	Type *type = &TYPE_UNKNOWN_OBJ;
 
 	if (node->decl_type != NULL) {
-		if (strcmp(node->decl_type, "int") == 0) {
+		if (strcmp(node->decl_type, "long") == 0) {
+			type = &TYPE_LONG_OBJ;
+	  } else if (strcmp(node->decl_type, "int") == 0) {
 			type = &TYPE_INT_OBJ;
+		} else if (strcmp(node->decl_type, "short") == 0) {
+			type = &TYPE_SHORT_OBJ;
+		} else if (strcmp(node->decl_type, "byte") == 0) {
+			type = &TYPE_BYTE_OBJ;
 		}
 	}
 
