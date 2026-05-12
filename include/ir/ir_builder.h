@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-IRValue ir_lower_expr(ASTNode *node, IRFunction *f, SymbolTable *table);
+int32_t ir_lower_expr(ASTNode *node, IRFunction *f, SymbolTable *table);
 
 void ir_lower(ASTNode *root, IRFunction *f, SymbolTable *table);
 

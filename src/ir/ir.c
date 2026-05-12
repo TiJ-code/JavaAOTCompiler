@@ -3,120 +3,144 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-static void ensure(IRFunction *f) {
+static void ensure_capacity(IRFunction *f) {
 	if (f->count >= f->capacity) {
 		f->capacity = f->capacity ? f->capacity * 2 : 8;
-		f->instrs = realloc(f->instrs, f->capacity * sizeof(IRInstr));
+		f->instrs = realloc(
+				f->instrs,
+			 	f->capacity * sizeof(IRInstr)
+		);
 	}
 }
 
 void ir_init(IRFunction *f) {
 	f->instrs = NULL;
+
 	f->count = 0;
 	f->capacity = 0;
+
+	f->next_temp = 0;
+	f->stack_size = 0;
 }
 
 void ir_emit(IRFunction *f, IRInstr ins) {
-	ensure(f);
+	ensure_capacity(f);
 	f->instrs[f->count++] = ins;
 }
 
-void ir_free(IRFunction *f) {
-	free(f->instrs);
-	f->instrs = NULL;
-	f->count = f->capacity = 0;
+int32_t ir_new_temp(IRFunction *f) {
+	return f->next_temp++;
 }
 
-void ir_print(IRFunction *f) {
+void ir_free(IRFunction *f) {
 	if (!f)
-		printf("function-ptr is null\n");
+		return;
 
 	for (size_t i = 0; i < f->count; i++) {
-		IRInstr instr = f->instrs[i];
+		IRInstr *ins = &f->instrs[i];
 
-		ir_instr_to_print(&instr);
+		if (ins->name != NULL) {
+			free(ins->name);
+			ins->name = NULL;
+		}
+	}
+
+	free(f->instrs);
+	f->instrs     = NULL;
+
+	f->count      = 0;
+	f->capacity   = 0;
+
+	f->next_temp  = 0;
+	f->stack_size = 0;
+}
+
+static const char *ir_type_name(IRType type) {
+	switch (type) {
+		case IR_CONST: return "CONST";
+		case IR_LOAD:  return "LOAD";
+		case IR_STORE: return "STORE";
+
+		case IR_ADD:   return "ADD";
+		case IR_SUB:   return "SUB";
+		case IR_MUL:   return "MUL";
+		case IR_DIV:   return "DIV";
+
+		case IR_RET:   return "RET";
+		default:       return "UNKNOWN";
+	}
+}
+
+static void print_temp(int32_t temp) {
+	if (temp >= 0)
+		printf("t%d", temp);
+	else
+		printf("-");
+}
+
+static void ir_print_instr(IRInstr *ins) {
+	printf("%-8s ", ir_type_name(ins->type));
+
+	switch (ins->type) {
+		case IR_CONST:
+			print_temp(ins->dst);
+			printf(" <- %d", ins->imm);
+			break;
+
+		case IR_LOAD:
+			print_temp(ins->dst);
+			printf(
+					" <- [rbp-%d] (%s)",
+					ins->stack_offset,
+					ins->name ? ins->name : "?"
+			);
+			break;
+
+		case IR_STORE:
+			printf(
+					"[rbp-%d] (%s) <- ",
+					ins->stack_offset,
+					ins->name ? ins->name : "?"
+			);
+			print_temp(ins->src1);
+			break;
+
+		case IR_ADD:
+		case IR_SUB:
+		case IR_MUL:
+		case IR_DIV:
+			print_temp(ins->dst);
+			printf(" <- ");
+			print_temp(ins->src1);
+			printf(" , ");
+			print_temp(ins->src2);
+			break;
+
+		case IR_RET:
+			print_temp(ins->src1);
+			break;
+
+		default:
+			printf("invalid");
+			break;
 	}
 
 	printf("\n");
 }
 
-void ir_instr_to_print(IRInstr *inst) {
-	if (!inst) {
-		printf("null");
+void ir_print(IRFunction *f) {
+	if (!f) {
+		printf("IRFunction is null\n");
 		return;
 	}
 
-	char result[1024] = "";
+	printf("\n === IR DUMP === \n");
 
-	char functype[64];
-	switch (inst->type) {
-		case IR_CONST:
-			sprintf(functype, "CONST");
-			break;
-		case IR_ADD:
-			sprintf(functype, "ADD");
-			break;
-		case IR_SUB:
-			sprintf(functype, "SUB");
-			break;
-		case IR_MUL:
-			sprintf(functype, "MUL");
-			break;
-		case IR_DIV:
-			sprintf(functype, "DIV");
-			break;
-		case IR_LOAD:
-			sprintf(functype, "LOAD");
-			break;
-		case IR_STORE:
-			sprintf(functype, "STORE");
-			break;
-		case IR_RET:
-			sprintf(functype, "RET");
-			break;
-		default:
-			sprintf(functype, "UNKNOWN");
-			break;
+	for (size_t i = 0; i < f->count; i++) {
+		printf("%04zu  ", i);
+ 	  ir_print_instr(&f->instrs[i]);	
 	}
 
-	strcat(result, functype);
-	strcat(result, " ");
-
-		strcat(result, "<");
-		if (inst->a.name != NULL) {
-			strcat(result, inst->a.name);
-			strcat(result, ":");
-		}
-
-		char a[20];
-		sprintf(a,"%d", inst->a.imm);
-
-		strcat(result, a);
-		strcat(result, ">");
-
-	strcat(result, "  ");
-
-		strcat(result, "<");
-		if (inst->b.name != NULL) {
-			strcat(result, inst->b.name);
-			strcat(result, ":");
-		}
-
-		char b[20];
-		sprintf(b, "%d", inst->b.imm);
-
-		strcat(result, b);
-		strcat(result, ">");
-
-	strcat(result, "  ->  ");
-
-		strcat(result, "<");
-		if (inst->dst.name != NULL) {
-			strcat(result, inst->dst.name);
-		} else {
-			strcat(result, "null");
-		}
-		strcat(result, ">");
-
-	printf("%s", result);
+	printf(" ============== \n");
 }
+

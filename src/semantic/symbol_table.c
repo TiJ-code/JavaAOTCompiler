@@ -22,19 +22,25 @@ static inline void scope_resize(Scope *scope) {
 	}
 }
 
-static void scope_add_symbol(Scope *scope, const char *name, Type *type, int32_t level) {
+static void scope_add_symbol(SymbolTable *table, Scope *scope, const char *name, Type *type, int32_t level) {
 	scope_resize(scope);
 
-	scope->symbols[scope->count].name        = strdup(name);
-	scope->symbols[scope->count].type        = type;
-	scope->symbols[scope->count].scope_level = level;
+	Symbol *sym = &scope->symbols[scope->count];
+
+	sym->name        = strdup(name);
+	sym->type        = type;
+	sym->scope_level = level;
+
+	table->next_stack_offset += 8;
+	sym->stack_offset         = table->next_stack_offset;
 
 	scope->count++;
 }
 
 void symbol_table_init(SymbolTable *table) {
-	table->scope_count    = 0;
-	table->scope_capacity = 4;
+	table->scope_count       = 0;
+	table->scope_capacity    = 4;
+	table->next_stack_offset = 0;
 
 	table->scopes = malloc(sizeof(Scope) * table->scope_capacity);
 }
@@ -84,7 +90,7 @@ bool symbol_table_define(SymbolTable *table, const char *name, Type *type) {
 			return false;
 	}
 
-	scope_add_symbol(scope, name, type, (int32_t)table->scope_count - 1);
+	scope_add_symbol(table, scope, name, type, (int32_t)table->scope_count - 1);
 
 	return true;
 }
@@ -100,5 +106,20 @@ bool symbol_table_exists(SymbolTable *table, const char *name) {
 	}
 
 	return false;
+}
+
+Symbol *symbol_table_lookup(SymbolTable *table, const char *name) {
+	for (int32_t s = (int32_t) table->scope_count - 1; s >= 0; s--) {
+		Scope *scope = &table->scopes[s];
+
+		for (size_t i = 0; i < scope->count; i++) {
+			Symbol *sym = &scope->symbols[i];
+
+			if (strcmp(sym->name, name) == 0)
+				return sym;
+		}
+	}
+
+	return NULL;
 }
 

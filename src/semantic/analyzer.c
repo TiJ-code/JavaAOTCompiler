@@ -73,7 +73,7 @@ static void analyze_block(ASTNode *node, SymbolTable *table) {
 		analyze_node(node->children->items[i], table);
 	}
 
-	symbol_table_pop_scope(table);
+//	symbol_table_pop_scope(table);
 }
 
 static void analyze_var_decl(ASTNode *node, SymbolTable *table) {
@@ -156,7 +156,6 @@ static void analyze_node(ASTNode *node, SymbolTable *table) {
 void semantic_analyze(ASTNode *root, SymbolTable *table) {
 	symbol_table_push_scope(table);
 	analyze_node(root, table);
-	symbol_table_pop_scope(table);
 
 	printf("Semantic analysis complete\n");
 }

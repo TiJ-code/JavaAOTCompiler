@@ -11,41 +11,47 @@ extern "C" {
 
 typedef enum {
 	IR_CONST,
+	IR_LOAD,
+	IR_STORE,
+
 	IR_ADD,
 	IR_SUB,
 	IR_MUL,
 	IR_DIV,
-	IR_LOAD,
-	IR_STORE,
+
 	IR_RET
 } IRType;
-
-typedef struct IRValue {
-	int32_t imm;
-	char *name;
-} IRValue;
 
 typedef struct IRInstr {
 	IRType type;
 
-	IRValue a;
-	IRValue b;
-	IRValue dst;
+	int32_t dst;
+
+	int32_t src1;
+	int32_t src2;
+
+	int32_t imm;
+	
+	char *name;
+	int32_t stack_offset;
 } IRInstr;
 
 typedef struct IRFunction {
 	IRInstr *instrs;
 	size_t count;
 	size_t capacity;
+
+	int32_t next_temp;
+	int32_t stack_size;
 } IRFunction;
 
 void ir_init(IRFunction *f);
 void ir_emit(IRFunction *f, IRInstr ins);
-void ir_free(IRFunction *f);
+int32_t ir_new_temp(IRFunction *f);
 
 void ir_print(IRFunction *f);
+void ir_free(IRFunction *f);
 
-void ir_instr_to_print(IRInstr *inst);
 #ifdef __cplusplus
 }
 #endif
