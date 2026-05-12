@@ -68,7 +68,6 @@ IRValue ir_lower_expr(ASTNode *node, IRFunction *f, SymbolTable *table) {
 
 	switch (node->type) {
 		case AST_LITERAL:
-			printf("LITERAL value debug: %d\n", node->value.int_value);
 			return make_const(node->value.int_value);
 
 		case AST_IDENTIFIER:

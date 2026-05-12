@@ -1,7 +1,9 @@
 #pragma once
 
+#include <stdio.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,6 +43,9 @@ void ir_init(IRFunction *f);
 void ir_emit(IRFunction *f, IRInstr ins);
 void ir_free(IRFunction *f);
 
+void ir_print(IRFunction *f);
+
+void ir_instr_to_print(IRInstr *inst);
 #ifdef __cplusplus
 }
 #endif

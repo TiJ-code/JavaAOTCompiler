@@ -3,6 +3,7 @@
 #include "semantic/analyzer.h"
 #include "semantic/symbol_table.h"
 #include "parser/parser.h"
+#include "ir/ir.h"
 #include "ir/ir_builder.h"
 #include "codegen/x86.h"
 
@@ -29,6 +30,8 @@ int main(int argc, char **argv) {
 
 	IRFunction ir;
 	ir_lower(root, &ir, &table);
+
+	ir_print(&ir);
 
 	FILE *out = fopen("out.s", "w");
 	x86_generate(&ir, out);
