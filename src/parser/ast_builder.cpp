@@ -214,6 +214,18 @@ std::any ASTBuilder::visitInclusiveOrExpression(JavaParser::InclusiveOrExpressio
 	return node;
 }
 
+std::any ASTBuilder::visitExclusiveOrExpression(JavaParser::ExclusiveOrExpressionContext *ctx) {
+	if (ctx->children.size() == 1)
+		return visit(ctx->children[0]);
+
+	ASTNode *node = ast_new_op("^");
+
+	ast_add_child(node, to_node(visit(ctx->children[0])));
+	ast_add_child(node, to_node(visit(ctx->children[2])));
+
+	return node;
+}
+
 std::any ASTBuilder::visitVariableDeclarator(JavaParser::VariableDeclaratorContext *ctx) {
     ASTNode *n = ast_new_node(AST_VAR_DECL);
 

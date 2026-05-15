@@ -42,6 +42,8 @@ class ASTBuilder : public JavaParserBaseVisitor {
 		std::any visitAndExpression(JavaParser::AndExpressionContext *ctx) override;
 
 		std::any visitInclusiveOrExpression(JavaParser::InclusiveOrExpressionContext *ctx) override;
+		
+		std::any visitExclusiveOrExpression(JavaParser::ExclusiveOrExpressionContext *ctx) override;
 
 		std::any visitVariableDeclarator(JavaParser::VariableDeclaratorContext *ctx) override;
 

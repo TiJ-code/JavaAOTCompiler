@@ -27,6 +27,9 @@ static IRType binary_op_type(const char *op) {
 	if (strcmp(op, "|") == 0)
 		return IR_OR;
 
+	if (strcmp(op, "^") == 0)
+		return IR_XOR;
+
 	return IR_DIV;
 }
 
@@ -105,6 +108,8 @@ static void ir_lower_assignment(ASTNode *node, IRFunction *f, SymbolTable *table
 		op.type = IR_AND;
 	else if (strcmp(node->value.op, "|=") == 0)
 		op.type = IR_OR;
+	else if (strcmp(node->value.op, "^=") == 0)
+		op.type = IR_XOR;
 	else
 		op.type = IR_DIV;
 
@@ -175,7 +180,8 @@ static void ir_lower_node(ASTNode *node, IRFunction *f, SymbolTable *table) {
 					strcmp(node->value.op, "/=") == 0 ||
 					strcmp(node->value.op, "%=") == 0 ||
 					strcmp(node->value.op, "&=") == 0 ||
-					strcmp(node->value.op, "|=") == 0) {
+					strcmp(node->value.op, "|=") == 0 ||
+					strcmp(node->value.op, "^=") == 0) {
 				ir_lower_assignment(node, f, table);
 			}
 			break;
