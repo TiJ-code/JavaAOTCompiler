@@ -80,11 +80,19 @@ void x86_generate(IRFunction *f, FILE *out) {
 				break;
 
 			case IR_DIV:
-				// x86 division uses rax/rdx
+				// x86 idivision uses rax/rdx
 				emit(out, 1, "mov %s, %%rax", temp_reg(ins->src1));
 				emit(out, 1, "cqo");
 				emit(out, 1, "idiv %s", temp_reg(ins->src2));
 				emit(out, 1, "mov %%rax, %s", temp_reg(ins->dst));
+				break;
+
+			case IR_MOD:
+				// x86 idivision uses rax/rdx and outputs remainder in rdx
+				emit(out, 1, "mov %s, %%rax", temp_reg(ins->src1));
+				emit(out, 1, "cqo");
+				emit(out, 1, "idiv %s", temp_reg(ins->src2));
+				emit(out, 1, "mov %%rdx, %s", temp_reg(ins->dst));
 				break;
 
 			case IR_RET:

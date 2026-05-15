@@ -18,6 +18,7 @@ typedef enum {
 	IR_SUB,
 	IR_MUL,
 	IR_DIV,
+	IR_MOD,
 
 	IR_RET
 } IRType;
