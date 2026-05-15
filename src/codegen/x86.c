@@ -23,6 +23,8 @@ static const char *temp_reg(int32_t temp) {
 		case 1: return "%r11";
 		case 2: return "%r12";
 		case 3: return "%r13";
+		case 4: return "%r14";
+		case 5: return "%r15";
 		default: return "%r10";
 	}
 }
@@ -110,6 +112,16 @@ void x86_generate(IRFunction *f, FILE *out) {
 				emit(out, 1, "xor %s, %s", temp_reg(ins->src2), temp_reg(ins->dst));
 				break;
 
+			case IR_NEG:
+				emit(out, 1, "mov %s, %s", temp_reg(ins->src1), temp_reg(ins->dst));
+				emit(out, 1, "neg %s", temp_reg(ins->dst));
+				break;
+
+			case IR_NOT:
+				emit(out, 1, "mov %s, %s", temp_reg(ins->src1), temp_reg(ins->dst));
+				emit(out, 1, "not %s", temp_reg(ins->dst));
+				break;
+
 			case IR_RET:
 				emit(out, 1, "mov %s, %%rax", temp_reg(ins->src1));
 				emit(out, 1, "leave");
@@ -117,6 +129,7 @@ void x86_generate(IRFunction *f, FILE *out) {
 				break;
 
 			default:
+				fprintf(stderr, "Unknown IR type: %d\n", ins->type);
 				break;
 		}
 	}

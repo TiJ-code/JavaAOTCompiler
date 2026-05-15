@@ -226,6 +226,44 @@ std::any ASTBuilder::visitExclusiveOrExpression(JavaParser::ExclusiveOrExpressio
 	return node;
 }
 
+std::any ASTBuilder::visitUnaryExpression(JavaParser::UnaryExpressionContext *ctx) {
+    if (ctx->INC() || ctx->DEC()) {
+        ASTNode *n = ast_new_unary_op(ctx->getText().c_str());
+        ast_add_child(n, to_node(visit(ctx->unaryExpression())));
+        return n;
+    }
+
+    if (ctx->ADD() || ctx->SUB()) {
+        const std::string op = ctx->SUB() ? "-" : "+";
+
+        ASTNode *n = ast_new_unary_op(op.c_str());
+        ast_add_child(n, to_node(visit(ctx->unaryExpression())));
+        return n;
+    }
+
+    if (ctx->unaryExpressionNotPlusMinus()) {
+        return visit(ctx->unaryExpressionNotPlusMinus());
+    }
+
+    return nullptr;
+}
+
+std::any ASTBuilder::visitUnaryExpressionNotPlusMinus(JavaParser::UnaryExpressionNotPlusMinusContext *ctx) {
+	if (ctx->TILDE()) {
+		ASTNode *n = ast_new_unary_op("~");
+		ast_add_child(n, to_node(visit(ctx->unaryExpression())));
+		return n;
+	}
+
+	if (ctx->BANG()) {
+		ASTNode *n = ast_new_op("!");
+		ast_add_child(n, to_node(visit(ctx->unaryExpression())));
+		return n;
+	}
+
+	return visit(ctx->postfixExpression());
+}
+
 std::any ASTBuilder::visitVariableDeclarator(JavaParser::VariableDeclaratorContext *ctx) {
     ASTNode *n = ast_new_node(AST_VAR_DECL);
 

@@ -30,7 +30,8 @@ static IRType binary_op_type(const char *op) {
 	if (strcmp(op, "^") == 0)
 		return IR_XOR;
 
-	return IR_DIV;
+	fprintf(stderr, "Unknown binary op: %s\n", op);
+        exit(1);
 }
 
 static void ir_lower_block(ASTNode *node, IRFunction *f , SymbolTable *table) {
@@ -264,6 +265,26 @@ int32_t ir_lower_expr(ASTNode *node, IRFunction *f, SymbolTable *table) {
 			ir_emit(f, ins);
 
 			return dst;
+		}
+
+		case AST_UNARY_OP: {
+    	int32_t val = ir_lower_expr(node->children->items[0], f, table);
+
+	    int32_t dst = ir_new_temp(f);
+
+  	  if (strcmp(node->value.op, "-") == 0) {
+        IRInstr ins = { .type = IR_NEG, .dst = dst, .src1 = val };
+        ir_emit(f, ins);
+        return dst;
+    	}
+
+	    if (strcmp(node->value.op, "~") == 0) {
+        IRInstr ins = { .type = IR_NOT, .dst = dst, .src1 = val };
+        ir_emit(f, ins);
+        return dst;
+  	  }
+
+    	return -1;
 		}
 
 		default:

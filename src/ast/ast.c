@@ -47,6 +47,12 @@ ASTNode *ast_new_op(const char *op) {
     return n;
 }
 
+ASTNode *ast_new_unary_op(const char *op) {
+	ASTNode *n = ast_new_node(AST_UNARY_OP);
+	n->value.op = strdup(op);
+	return n;
+}
+
 void ast_add_child(ASTNode *parent, ASTNode *child) {
     if (!parent || !child) return;
     list_add(parent->children, child);

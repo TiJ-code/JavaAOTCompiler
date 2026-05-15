@@ -24,7 +24,8 @@ extern "C" {
 
 		AST_LITERAL,
 		AST_IDENTIFIER,
-		AST_BINARY_OP
+		AST_BINARY_OP,
+		AST_UNARY_OP
 	} ASTType;
 
 	typedef struct ASTNode ASTNode;
@@ -61,6 +62,7 @@ extern "C" {
 	ASTNode *ast_new_int(int32_t value);
 	ASTNode *ast_new_ident(const char *name);
 	ASTNode *ast_new_op(const char *op);
+	ASTNode *ast_new_unary_op(const char *op);
 
 	void ast_add_child(ASTNode *parent, ASTNode *child);
 
