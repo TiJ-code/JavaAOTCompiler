@@ -21,6 +21,7 @@ typedef enum {
 	IR_MOD,
 
 	IR_AND,
+	IR_OR,
 
 	IR_RET
 } IRType;

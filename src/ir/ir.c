@@ -68,6 +68,7 @@ static const char *ir_type_name(IRType type) {
 		case IR_MOD:   return "MOD";
 
 		case IR_AND:   return "AND";
+		case IR_OR:    return "OR";
 
 		case IR_RET:   return "RET";
 		default:       return "UNKNOWN";
@@ -114,6 +115,7 @@ static void ir_print_instr(IRInstr *ins) {
 		case IR_DIV:
 		case IR_MOD:
 		case IR_AND:
+		case IR_OR:
 			print_temp(ins->dst);
 			printf(" <- ");
 			print_temp(ins->src1);
