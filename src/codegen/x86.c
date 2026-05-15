@@ -95,6 +95,11 @@ void x86_generate(IRFunction *f, FILE *out) {
 				emit(out, 1, "mov %%rdx, %s", temp_reg(ins->dst));
 				break;
 
+			case IR_AND:
+				emit(out, 1, "mov %s, %s", temp_reg(ins->src1), temp_reg(ins->dst));
+				emit(out, 1, "and %s, %s", temp_reg(ins->src2), temp_reg(ins->dst));
+				break;
+
 			case IR_RET:
 				emit(out, 1, "mov %s, %%rax", temp_reg(ins->src1));
 				emit(out, 1, "leave");
