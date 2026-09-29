@@ -2,26 +2,24 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 static void ensure_capacity(IRFunction *f) {
 	if (f->count >= f->capacity) {
 		f->capacity = f->capacity ? f->capacity * 2 : 8;
-		f->instrs = realloc(
-				f->instrs,
-			 	f->capacity * sizeof(IRInstr)
-		);
+		f->instrs = realloc(f->instrs, f->capacity * sizeof(IRInstr));
 	}
 }
 
 void ir_init(IRFunction *f) {
-	f->instrs = NULL;
-
-	f->count = 0;
-	f->capacity = 0;
-
-	f->next_temp = 0;
+	f->instrs     = NULL;
+	f->count      = 0;
+	f->capacity   = 0;
+	f->next_temp  = 0;
 	f->stack_size = 0;
 }
+
+/* ---------------- core ---------------- */
 
 void ir_emit(IRFunction *f, IRInstr ins) {
 	ensure_capacity(f);
@@ -32,119 +30,145 @@ int32_t ir_new_temp(IRFunction *f) {
 	return f->next_temp++;
 }
 
-void ir_free(IRFunction *f) {
-	if (!f)
-		return;
+/* ---------------- CONST ---------------- */
 
-	for (size_t i = 0; i < f->count; i++) {
-		IRInstr *ins = &f->instrs[i];
+int32_t ir_emit_const(IRFunction *f, int32_t value) {
+	int32_t t = ir_new_temp(f);
 
-		if (ins->name != NULL) {
-			free(ins->name);
-			ins->name = NULL;
+	IRInstr ins = {
+		.type = IR_CONST,
+		.dst  = t,
+		.cst  = { .imm = value }
+	};
+
+	ir_emit(f, ins);
+	return t;
+}
+
+/* ---------------- BINOP ---------------- */
+
+int32_t ir_emit_binop(IRFunction *f, BinOp op, int32_t a, int32_t b) {
+	int32_t t = ir_new_temp(f);
+
+	IRInstr ins = {
+		.type  = IR_BINOP,
+		.dst   = t,
+		.binop = {
+			.op  = op,
+			.lhs = a,
+			.rhs = b
 		}
-	}
+	};
 
-	free(f->instrs);
-	f->instrs     = NULL;
-
-	f->count      = 0;
-	f->capacity   = 0;
-
-	f->next_temp  = 0;
-	f->stack_size = 0;
+	ir_emit(f, ins);
+	return t;
 }
 
-static const char *ir_type_name(IRType type) {
-	switch (type) {
-		case IR_CONST: return "CONST";
-		case IR_LOAD:  return "LOAD";
-		case IR_STORE: return "STORE";
+/* ---------------- UNARY ---------------- */
 
-		case IR_ADD:   return "ADD";
-		case IR_SUB:   return "SUB";
-		case IR_MUL:   return "MUL";
-		case IR_DIV:   return "DIV";
-		case IR_MOD:   return "MOD";
+int32_t ir_emit_unary(IRFunction *f, UnaryOp op, int32_t src) {
+	int32_t t = ir_new_temp(f);
 
-		case IR_AND:   return "AND";
-		case IR_OR:    return "OR";
-		case IR_XOR:   return "XOR";
-		case IR_NOT:   return "NOT";
-		case IR_NEG:   return "NEG";
+	IRInstr ins = {
+		.type  = IR_UNARY,
+		.dst   = t,
+		.unary = {
+			.op  = op,
+			.src = src
+		}
+	};
 
-		case IR_RET:   return "RET";
-		default:       return "UNKNOWN";
-	}
+	ir_emit(f, ins);
+	return t;
 }
 
-static void print_temp(int32_t temp) {
-	if (temp >= 0)
-		printf("t%d", temp);
-	else
-		printf("-");
+/* ---------------- LOAD ---------------- */
+
+int32_t ir_emit_load(IRFunction *f, Symbol *sym) {
+	int32_t t = ir_new_temp(f);
+
+	IRInstr ins = {
+		.type = IR_LOAD,
+		.dst  = t,
+		.mem  = {
+			.src          = t,
+			.stack_offset = sym->stack_offset,
+			.name         = strdup(sym->name)
+		}
+	};
+
+	ir_emit(f, ins);
+	return t;
 }
+
+/* ---------------- STORE ---------------- */
+
+void ir_emit_store(IRFunction *f, Symbol *sym, int32_t src) {
+	IRInstr ins = {
+		.type = IR_STORE,
+		.mem  = {
+			.src          = src,
+			.stack_offset = sym->stack_offset,
+			.name         = strdup(sym->name)
+		}
+	};
+
+	ir_emit(f, ins);
+}
+
+/* ---------------- RET ---------------- */
+
+void ir_emit_ret(IRFunction *f, int32_t value) {
+	IRInstr ins = {
+		.type = IR_RET,
+		.ret  = { .value = value }
+	};
+
+	ir_emit(f, ins);
+}
+
+/* ---------------- PRINT ---------------- */
 
 static void ir_print_instr(IRInstr *ins) {
-	printf("%-8s ", ir_type_name(ins->type));
-
 	switch (ins->type) {
+
 		case IR_CONST:
-			print_temp(ins->dst);
-			printf(" <- %d", ins->imm);
+			printf("CONST t%d <- %d", ins->dst, ins->cst.imm);
+			break;
+
+		case IR_BINOP:
+			printf("BINOP t%d <- t%d op t%d",
+			       ins->dst,
+			       ins->binop.lhs,
+			       ins->binop.rhs);
+			break;
+
+		case IR_UNARY:
+			printf("UNARY t%d <- op t%d",
+			       ins->dst,
+			       ins->unary.src);
 			break;
 
 		case IR_LOAD:
-			print_temp(ins->dst);
-			printf(
-					" <- [rbp-%d] (%s)",
-					ins->stack_offset,
-					ins->name ? ins->name : "?"
-			);
+			printf("LOAD t%d <- [rbp-%d] (%s)",
+			       ins->dst,
+			       ins->mem.stack_offset,
+			       ins->mem.name ? ins->mem.name : "?");
 			break;
 
 		case IR_STORE:
-			printf(
-					"[rbp-%d] (%s) <- ",
-					ins->stack_offset,
-					ins->name ? ins->name : "?"
-			);
-			print_temp(ins->src1);
-			break;
-
-		case IR_ADD:
-		case IR_SUB:
-		case IR_MUL:
-		case IR_DIV:
-		case IR_MOD:
-		case IR_AND:
-		case IR_OR:
-		case IR_XOR:
-			print_temp(ins->dst);
-			printf(" <- ");
-			print_temp(ins->src1);
-			printf(" , ");
-			print_temp(ins->src2);
-			break;
-
-		case IR_NEG:
-			print_temp(ins->dst);
-			printf(" <- -");
-			print_temp(ins->src1);
-			break;
-
-		case IR_NOT:
-			print_temp(ins->dst);
-			printf(" <- ~");
-			print_temp(ins->src1);
+			printf("STORE [rbp-%d] <- t%d (%s)",
+			       ins->mem.stack_offset,
+			       ins->mem.src,
+			       ins->mem.name ? ins->mem.name : "?");
 			break;
 
 		case IR_RET:
-			print_temp(ins->src1);
+			printf("RET t%d", ins->ret.value);
 			break;
 
 		default:
-			printf("invalid");
+			printf("UNKNOWN");
 			break;
 	}
 
@@ -161,9 +185,31 @@ void ir_print(IRFunction *f) {
 
 	for (size_t i = 0; i < f->count; i++) {
 		printf("%04zu  ", i);
- 	  ir_print_instr(&f->instrs[i]);	
+		ir_print_instr(&f->instrs[i]);
 	}
 
 	printf(" ============== \n");
 }
 
+/* ---------------- FREE ---------------- */
+
+void ir_free(IRFunction *f) {
+	if (!f) return;
+
+	for (size_t i = 0; i < f->count; i++) {
+		IRInstr *ins = &f->instrs[i];
+
+		if ((ins->type == IR_LOAD || ins->type == IR_STORE) && ins->mem.name) {
+			free(ins->mem.name);
+			ins->mem.name = NULL;
+		}
+	}
+
+	free(f->instrs);
+
+	f->instrs     = NULL;
+	f->count      = 0;
+	f->capacity   = 0;
+	f->next_temp  = 0;
+	f->stack_size = 0;
+}

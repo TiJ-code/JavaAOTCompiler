@@ -1,147 +1,98 @@
 #include "ir/ir_builder.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 
 static void ir_lower_node(ASTNode *node, IRFunction *f, SymbolTable *table);
 
-static IRType binary_op_type(const char *op) {
-	if (strcmp(op, "+") == 0)
-		return IR_ADD;
+/* ---------------- OP conversion ---------------- */
 
-	if (strcmp(op, "-") == 0)
-		return IR_SUB;
+static BinOp to_binop(const char *op) {
+	if (!strcmp(op, "+")) return OP_ADD;
+	if (!strcmp(op, "-")) return OP_SUB;
+	if (!strcmp(op, "*")) return OP_MUL;
+	if (!strcmp(op, "/")) return OP_DIV;
+	if (!strcmp(op, "%")) return OP_MOD;
+	if (!strcmp(op, "&")) return OP_AND;
+	if (!strcmp(op, "|")) return OP_OR;
+	if (!strcmp(op, "^")) return OP_XOR;
 
-	if (strcmp(op, "*") == 0)
-		return IR_MUL;
-
-	if (strcmp(op, "/") == 0)
-		return IR_DIV;
-
-	if (strcmp(op, "%") == 0)
-		return IR_MOD;
-
-	if (strcmp(op, "&") == 0)
-		return IR_AND;
-
-	if (strcmp(op, "|") == 0)
-		return IR_OR;
-
-	if (strcmp(op, "^") == 0)
-		return IR_XOR;
-
-	fprintf(stderr, "Unknown binary op: %s\n", op);
-        exit(1);
+	fprintf(stderr, "unknown binary op: %s\n", op);
+	exit(1);
 }
 
-static void ir_lower_block(ASTNode *node, IRFunction *f , SymbolTable *table) {
+static int is_assignment_op(const char *op) {
+	return !strcmp(op, "=")  ||
+	       !strcmp(op, "+=") ||
+	       !strcmp(op, "-=") ||
+	       !strcmp(op, "*=") ||
+	       !strcmp(op, "/=") ||
+	       !strcmp(op, "%=") ||
+	       !strcmp(op, "&=") ||
+	       !strcmp(op, "|=") ||
+	       !strcmp(op, "^=");
+}
+
+/* ---------------- block ---------------- */
+
+static void ir_lower_block(ASTNode *node, IRFunction *f, SymbolTable *table) {
 	for (size_t i = 0; i < node->children->count; i++) {
 		ir_lower_node(node->children->items[i], f, table);
 	}
 }
 
-static void emit_store(IRFunction *f, Symbol *sym, int32_t src_temp) {
-	IRInstr ins = {
-		.type         = IR_STORE,
-		.src1         = src_temp,
-		.stack_offset = sym->stack_offset,
-		.name         = strdup(sym->name)
-	};
-
-	ir_emit(f, ins);
-}
-
-static int32_t emit_load(IRFunction *f, Symbol *sym) {
-	int32_t dst = ir_new_temp(f);
-
-	IRInstr ins = {
-		.type         = IR_LOAD,
-		.dst          = dst,
-		.stack_offset = sym->stack_offset,
-		.name         = strdup(sym->name)
-	};
-
-	ir_emit(f, ins);
-
-	return dst;
-}
+/* ---------------- assignment ---------------- */
 
 static void ir_lower_assignment(ASTNode *node, IRFunction *f, SymbolTable *table) {
 	ASTNode *lhs = node->children->items[0];
 	ASTNode *rhs = node->children->items[1];
 
 	Symbol *sym = symbol_table_lookup(table, lhs->value.str);
+	if (!sym) {
+		fprintf(stderr, "unknown symbol: %s\n", lhs->value.str);
+		exit(1);
+	}
 
-	if (!sym)
-		return;
-
-	// x = expr;
-	if (strcmp(node->value.op, "=") == 0) {
-		int32_t rhs_temp = ir_lower_expr(rhs, f, table);
-
-		emit_store(f, sym, rhs_temp);
+	/* x = expr */
+	if (!strcmp(node->value.op, "=")) {
+		int32_t v = ir_lower_expr(rhs, f, table);
+		ir_emit_store(f, sym, v);
 		return;
 	}
 
-	// x += expr;
-	// x -= expr;
-	// ...
-	int32_t lhs_temp = emit_load(f, sym);
-	int32_t rhs_temp = ir_lower_expr(rhs, f, table);
+	/* x += expr style */
+	int32_t a = ir_emit_load(f, sym);
+	int32_t b = ir_lower_expr(rhs, f, table);
 
-	int32_t result = ir_new_temp(f);
+	int32_t r = ir_emit_binop(f, to_binop(node->value.op), a, b);
 
-	IRInstr op = {
-		.dst  = result,
-		.src1 = lhs_temp,
-		.src2 = rhs_temp
-	};
-
-	if (strcmp(node->value.op, "+=") == 0)
-		op.type = IR_ADD;
-	else if (strcmp(node->value.op, "-=") == 0)
-		op.type = IR_SUB;
-	else if (strcmp(node->value.op, "*=") == 0)
-		op.type = IR_MUL;
-	else if (strcmp(node->value.op, "%=") == 0)
-		op.type = IR_MOD;
-	else if (strcmp(node->value.op, "&=") == 0)
-		op.type = IR_AND;
-	else if (strcmp(node->value.op, "|=") == 0)
-		op.type = IR_OR;
-	else if (strcmp(node->value.op, "^=") == 0)
-		op.type = IR_XOR;
-	else
-		op.type = IR_DIV;
-
-	ir_emit(f, op);
-
-	emit_store(f, sym, result);
-
-
+	ir_emit_store(f, sym, r);
 }
+
+/* ---------------- var decl ---------------- */
 
 static void ir_lower_var_decl(ASTNode *node, IRFunction *f, SymbolTable *table) {
 	if (!node->children || node->children->count == 0)
 		return;
 
 	Symbol *sym = symbol_table_lookup(table, node->value.str);
+	if (!sym) {
+		fprintf(stderr, "unknown symbol: %s\n", node->value.str);
+		exit(1);
+	}
 
-	if (!sym)
-		return;
-
-	ASTNode *init = node->children->items[0];
-
-	int32_t value = ir_lower_expr(init, f, table);
-
-	emit_store(f, sym, value);
+	int32_t v = ir_lower_expr(node->children->items[0], f, table);
+	ir_emit_store(f, sym, v);
 }
 
+/* ---------------- node walker ---------------- */
+
 static void ir_lower_node(ASTNode *node, IRFunction *f, SymbolTable *table) {
-	if (!node)
-		return;
+	if (!node) return;
 
 	switch (node->type) {
+
 		case AST_PROGRAM:
 		case AST_CLASS_DECL:
 		case AST_METHOD_DECL:
@@ -159,30 +110,13 @@ static void ir_lower_node(ASTNode *node, IRFunction *f, SymbolTable *table) {
 			break;
 
 		case AST_RETURN: {
-			if (!node->children || node->children->count == 0)
-				return;
-
-			int32_t value = ir_lower_expr(node->children->items[0], f, table);
-
-			IRInstr ins = {
-				.type = IR_RET,
-				.src1 = value
-			};
-
-			ir_emit(f, ins);
+			int32_t v = ir_lower_expr(node->children->items[0], f, table);
+			ir_emit_ret(f, v);
 			break;
 		}
 
 		case AST_BINARY_OP:
-			if (strcmp(node->value.op, "=") == 0 ||
-					strcmp(node->value.op, "+=") == 0 ||
-					strcmp(node->value.op, "-=") == 0 ||
-					strcmp(node->value.op, "*=") == 0 ||
-					strcmp(node->value.op, "/=") == 0 ||
-					strcmp(node->value.op, "%=") == 0 ||
-					strcmp(node->value.op, "&=") == 0 ||
-					strcmp(node->value.op, "|=") == 0 ||
-					strcmp(node->value.op, "^=") == 0) {
+			if (is_assignment_op(node->value.op)) {
 				ir_lower_assignment(node, f, table);
 			}
 			break;
@@ -192,110 +126,62 @@ static void ir_lower_node(ASTNode *node, IRFunction *f, SymbolTable *table) {
 	}
 }
 
+/* ---------------- expr ---------------- */
+
 int32_t ir_lower_expr(ASTNode *node, IRFunction *f, SymbolTable *table) {
-	if (!node)
-		return -1;
+	if (!node) return -1;
 
 	switch (node->type) {
-		case AST_LITERAL: {
-			int32_t dst = ir_new_temp(f);
 
-			IRInstr ins = {
-				.type = IR_CONST,
-				.dst = dst,
-				.imm = node->value.int_value
-			};
-
-			ir_emit(f, ins);
-
-			return dst;
-		}
+		case AST_LITERAL:
+			return ir_emit_const(f, node->value.int_value);
 
 		case AST_IDENTIFIER: {
 			Symbol *sym = symbol_table_lookup(table, node->value.str);
-
-			if (!sym)
-				return -1;
-
-			return emit_load(f, sym);
+			if (!sym) {
+				fprintf(stderr, "unknown symbol: %s\n", node->value.str);
+				exit(1);
+			}
+			return ir_emit_load(f, sym);
 		}
 
 		case AST_BINARY_OP: {
-			if (strcmp(node->value.op, "=") == 0 ||
-					strcmp(node->value.op, "+=") == 0 ||
-					strcmp(node->value.op, "-=") == 0 ||
-					strcmp(node->value.op, "*=") == 0 ||
-					strcmp(node->value.op, "/=") == 0 ||
-					strcmp(node->value.op, "%=") == 0 ||
-					strcmp(node->value.op, "&=") == 0 ||
-					strcmp(node->value.op, "|=") == 0) {
+			if (is_assignment_op(node->value.op)) {
 				ir_lower_assignment(node, f, table);
 
-				ASTNode *lhs = node->children->items[0];
-
-				Symbol *sym = symbol_table_lookup(
-						table, lhs->value.str
-				);
-
-				if (!sym)
-					return -1;
-
-				return emit_load(f, sym);
+				Symbol *sym = symbol_table_lookup(table, node->children->items[0]->value.str);
+				return ir_emit_load(f, sym);
 			}
 
-			int32_t lhs = ir_lower_expr(
-					node->children->items[0],
-					f, table
-			);
+			int32_t a = ir_lower_expr(node->children->items[0], f, table);
+			int32_t b = ir_lower_expr(node->children->items[1], f, table);
 
-			int32_t rhs = ir_lower_expr(
-					node->children->items[1],
-					f, table
-			);
-
-			int32_t dst = ir_new_temp(f);
-
-			IRInstr ins = {
-				.type = binary_op_type(node->value.op),
-				.dst = dst,
-				.src1 = lhs,
-				.src2 = rhs
-			};
-
-			ir_emit(f, ins);
-
-			return dst;
+			return ir_emit_binop(f, to_binop(node->value.op), a, b);
 		}
 
 		case AST_UNARY_OP: {
-    	int32_t val = ir_lower_expr(node->children->items[0], f, table);
+			int32_t v = ir_lower_expr(node->children->items[0], f, table);
 
-	    int32_t dst = ir_new_temp(f);
+			if (!strcmp(node->value.op, "-"))
+				return ir_emit_unary(f, UOP_NEG, v);
 
-  	  if (strcmp(node->value.op, "-") == 0) {
-        IRInstr ins = { .type = IR_NEG, .dst = dst, .src1 = val };
-        ir_emit(f, ins);
-        return dst;
-    	}
+			if (!strcmp(node->value.op, "~"))
+				return ir_emit_unary(f, UOP_NOT, v);
 
-	    if (strcmp(node->value.op, "~") == 0) {
-        IRInstr ins = { .type = IR_NOT, .dst = dst, .src1 = val };
-        ir_emit(f, ins);
-        return dst;
-  	  }
-
-    	return -1;
+			fprintf(stderr, "unknown unary op: %s\n", node->value.op);
+			exit(1);
 		}
 
 		default:
-			return -1;
+			fprintf(stderr, "unsupported AST node\n");
+			exit(1);
 	}
 }
 
+/* ---------------- entry ---------------- */
+
 void ir_lower(ASTNode *root, IRFunction *f, SymbolTable *table) {
 	ir_init(f);
-
 	ir_lower_node(root, f, table);
-
 	f->stack_size = table->next_stack_offset;
 }
