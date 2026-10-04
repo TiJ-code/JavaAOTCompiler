@@ -10,8 +10,16 @@ if(NOT DEFINED OUTPUT_DIR)
     message(FATAL_ERROR "OUTPUT_DIR was not provided")
 endif()
 
-if(NOT DEFINED CC)
-    message(FATAL_ERROR "CC was not provided")
+if(NOT DEFINED CXX)
+    message(FATAL_ERROR "CXX was not provided")
+endif()
+
+if(NOT DEFINED RUNTIME)
+    message(FATAL_ERROR "RUNTIME was not provided")
+endif()
+
+if(NOT DEFINED LAUNCHER)
+    message(FATAL_ERROR "LAUNCHER was not provided")
 endif()
 
 file(MAKE_DIRECTORY "${OUTPUT_DIR}")
@@ -20,9 +28,11 @@ get_filename_component(PROGRAM_NAME "${INPUT}" NAME_WE)
 
 set(ASM "${OUTPUT_DIR}/${PROGRAM_NAME}.s")
 set(OBJ "${OUTPUT_DIR}/${PROGRAM_NAME}.o")
+set(EXECUTABLE "${OUTPUT_DIR}/${PROGRAM_NAME}")
 
 message(STATUS "JAOT0 compiling ${INPUT}")
 
+# .jaot -> .s
 execute_process(
         COMMAND
         "${JAOT0}"
@@ -50,9 +60,10 @@ endif()
 
 message(STATUS "Generated ${ASM}")
 
+# .s -> .o
 execute_process(
         COMMAND
-        "${CC}"
+        "${CXX}"
         -c
         "${ASM}"
         -o "${OBJ}"
@@ -69,4 +80,49 @@ if(NOT ASSEMBLE_RESULT EQUAL 0)
     )
 endif()
 
-message(STATUS "Assembly for ${PROGRAM_NAME} is valid")
+message(STATUS "Assembled ${OBJ}")
+
+# .o + launcher + runtime -> executable
+execute_process(
+        COMMAND
+        "${CXX}"
+        "${OBJ}"
+        "${LAUNCHER}"
+        "${RUNTIME}"
+        -o "${EXECUTABLE}"
+        RESULT_VARIABLE LINK_RESULT
+        OUTPUT_VARIABLE LINK_OUTPUT
+        ERROR_VARIABLE LINK_ERROR
+)
+
+if(NOT LINK_RESULT EQUAL 0)
+    message(FATAL_ERROR
+            "Failed to link ${PROGRAM_NAME}\n"
+            "stdout:\n${LINK_OUTPUT}\n"
+            "stderr:\n${LINK_ERROR}"
+    )
+endif()
+
+message(STATUS "Linked ${EXECUTABLE}")
+
+# run generated program
+execute_process(
+        COMMAND
+        "${EXECUTABLE}"
+        RESULT_VARIABLE RUN_RESULT
+        OUTPUT_VARIABLE RUN_OUTPUT
+        ERROR_VARIABLE RUN_ERROR
+)
+
+if(NOT RUN_RESULT EQUAL 0)
+    message(FATAL_ERROR
+            "Generated program ${PROGRAM_NAME} failed\n"
+            "exit code: ${RUN_RESULT}\n"
+            "stdout:\n${RUN_OUTPUT}\n"
+            "stderr:\n${RUN_ERROR}"
+    )
+endif()
+
+message(STATUS "Executed ${PROGRAM_NAME}")
+message(STATUS "Program output:")
+message(STATUS "${RUN_OUTPUT}")

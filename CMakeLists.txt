@@ -77,7 +77,9 @@ add_test(
         -DJAOT0=$<TARGET_FILE:jaot0>
         -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/hello.jaot
         -DOUTPUT_DIR=${JAOT0_TEST_OUTPUT_DIR}
-        -DCC=${CMAKE_CXX_COMPILER}
+        -DCXX=${CMAKE_CXX_COMPILER}
+        -DRUNTIME=$<TARGET_FILE:jaot_runtime>
+        -DLAUNCHER=${CMAKE_CURRENT_SOURCE_DIR}/tests/runtime/launcher.cpp
         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_test.cmake
 )
 
@@ -88,7 +90,9 @@ add_test(
         -DJAOT0=$<TARGET_FILE:jaot0>
         -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/functions.jaot
         -DOUTPUT_DIR=${JAOT0_TEST_OUTPUT_DIR}
-        -DCC=${CMAKE_CXX_COMPILER}
+        -DCXX=${CMAKE_CXX_COMPILER}
+        -DRUNTIME=$<TARGET_FILE:jaot_runtime>
+        -DLAUNCHER=${CMAKE_CURRENT_SOURCE_DIR}/tests/runtime/launcher.cpp
         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_test.cmake
 )
 
