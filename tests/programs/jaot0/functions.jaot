@@ -1,0 +1,6 @@
+class Main {
+    static void main() {
+        int answer = 20 + 22;
+        printInt(answer);
+    }
+}

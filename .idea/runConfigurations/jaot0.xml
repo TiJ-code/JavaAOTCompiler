@@ -1,0 +1,7 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="jaot0" type="CMakeRunConfiguration" factoryName="Application" PROGRAM_PARAMS="../../tests/programs/jaot0/hello.jaco -S -o tests/programs/jaot0/hello.jaco" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="jaot" TARGET_NAME="jaot0" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="jaot" RUN_TARGET_NAME="jaot0">
+    <method v="2">
+      <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+    </method>
+  </configuration>
+</component>

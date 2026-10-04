@@ -65,3 +65,41 @@ add_test(
         NAME jaot0_help
         COMMAND jaot0 --help
 )
+
+set(JAOT0_TEST_OUTPUT_DIR
+        "${CMAKE_CURRENT_BINARY_DIR}/tests/programs/jaot0"
+)
+
+add_custom_target(jaot0_tests
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+        DEPENDS jaot0
+)
+
+add_test(
+        NAME jaot0_compile_hello
+        COMMAND
+        ${CMAKE_COMMAND}
+        -DJAOT0=$<TARGET_FILE:jaot0>
+        -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/hello.jaot
+        -DOUTPUT_DIR=${JAOT0_TEST_OUTPUT_DIR}
+        -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_test.cmake
+)
+
+add_test(
+        NAME jaot0_compile_functions
+        COMMAND
+        ${CMAKE_COMMAND}
+        -DJAOT0=$<TARGET_FILE:jaot0>
+        -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/functions.jaot
+        -DOUTPUT_DIR=${JAOT0_TEST_OUTPUT_DIR}
+        -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_test.cmake
+)
+
+set_tests_properties(
+        jaot0_compile_hello
+        jaot0_compile_functions
+        PROPERTIES
+        DEPENDS jaot0_help
+)
