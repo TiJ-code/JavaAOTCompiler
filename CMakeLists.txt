@@ -70,11 +70,6 @@ set(JAOT0_TEST_OUTPUT_DIR
         "${CMAKE_CURRENT_BINARY_DIR}/tests/programs/jaot0"
 )
 
-add_custom_target(jaot0_tests
-        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
-        DEPENDS jaot0
-)
-
 add_test(
         NAME jaot0_compile_hello
         COMMAND
@@ -82,7 +77,7 @@ add_test(
         -DJAOT0=$<TARGET_FILE:jaot0>
         -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/hello.jaot
         -DOUTPUT_DIR=${JAOT0_TEST_OUTPUT_DIR}
-        -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+        -DCC=${CMAKE_CXX_COMPILER}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_test.cmake
 )
 
@@ -93,7 +88,7 @@ add_test(
         -DJAOT0=$<TARGET_FILE:jaot0>
         -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/functions.jaot
         -DOUTPUT_DIR=${JAOT0_TEST_OUTPUT_DIR}
-        -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+        -DCC=${CMAKE_CXX_COMPILER}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_test.cmake
 )
 

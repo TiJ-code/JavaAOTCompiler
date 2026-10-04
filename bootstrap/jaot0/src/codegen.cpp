@@ -2,6 +2,7 @@
 
 #include <complex>
 #include <stdexcept>
+#include <unordered_map>
 
 namespace JAOT {
     namespace {
@@ -12,6 +13,8 @@ namespace JAOT {
             }
 
             void generate(const Method &method) {
+                collectLocals(method);
+
                 out_ << ".text\n";
                 out_ << ".globl jaot_" << method.name << "\n";
                 out_ << ".type jaot_" << method.name << ", @function \n";
@@ -19,6 +22,10 @@ namespace JAOT {
 
                 out_ << "    pushq %rbp\n";
                 out_ << "    movq %rsp, %rbp\n";
+
+                if (stackSize_ > 0) {
+                    out_ << "    subq $" << stackSize_ << ", %rsp\n";
+                }
 
                 for (const Stmt &statement : method.body) {
                     generateStatement(statement);
@@ -30,11 +37,29 @@ namespace JAOT {
             }
 
         private:
+            static constexpr int LocalSize = 4;
+
+            void collectLocals(const Method &method) {
+                for (const Stmt &statement : method.body) {
+                    if (statement.kind != StmtKind::VarDecl) {
+                        continue;
+                    }
+
+                    if (locals_.contains(statement.name)) {
+                        throw std::runtime_error("duplicate variable: " +
+                             statement.name);
+                    }
+
+                    stackSize_ += LocalSize;
+
+                    locals_.emplace(statement.name, -stackSize_);
+                }
+            }
+
             void generateStatement(const Stmt &statement) {
                 switch (statement.kind) {
                     case StmtKind::VarDecl:
-                        generateExpression(*statement.expression);
-                        out_ << "    pushq %rax\n";
+                        generateVariableDeclaration(statement);
                         return;
 
                     case StmtKind::Expression:
@@ -49,6 +74,18 @@ namespace JAOT {
                 }
 
                 throw std::runtime_error("unknown statement kind");
+            }
+
+            void generateVariableDeclaration(const Stmt &statement) {
+                if (!statement.expression) {
+                    throw std::runtime_error("variable declaration without initializer: " + statement.name);
+                }
+
+                generateExpression(*statement.expression);
+
+                const int offset = localOffset(statement.name);
+
+                out_ << "    movl %eax, " << offset << "(%rbp)\n";
             }
 
             void generateExpression(const Expr &expression) {
@@ -66,10 +103,17 @@ namespace JAOT {
                         return;
 
                     case ExprKind::Variable:
-                        throw std::runtime_error("variable code generation is not implemented");
+                        generateVariable(expression);
+                        return;
                 }
 
                 throw std::runtime_error("unknown expression kind");
+            }
+
+            void generateVariable(const Expr &expression) {
+                const int offset = localOffset(expression.name);
+
+                out_ << "    movl " << offset << "(%rbp), %eax\n";
             }
 
             void generateBinary(const Expr &expression) {
@@ -91,7 +135,7 @@ namespace JAOT {
                         break;
 
                     case '*':
-                        out_ << "    imull %ecx, $eax\n";
+                        out_ << "    imull %ecx, %eax\n";
                         break;
 
                     default:
@@ -115,7 +159,21 @@ namespace JAOT {
                 throw std::runtime_error("unknown function: " + expression.callee);
             }
 
+            int localOffset(const std::string &name) const {
+                const auto it = locals_.find(name);
+
+                if (it == locals_.end()) {
+                    throw std::runtime_error("unknown variable: " + name);
+                }
+
+                return it->second;
+            }
+
             std::ostream &out_;
+
+            std::unordered_map<std::string, int> locals_;
+
+            int stackSize_ = 0;
         };
 
     }

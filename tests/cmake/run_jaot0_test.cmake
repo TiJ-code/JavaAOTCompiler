@@ -10,16 +10,22 @@ if(NOT DEFINED OUTPUT_DIR)
     message(FATAL_ERROR "OUTPUT_DIR was not provided")
 endif()
 
+if(NOT DEFINED CC)
+    message(FATAL_ERROR "CC was not provided")
+endif()
+
 file(MAKE_DIRECTORY "${OUTPUT_DIR}")
 
 get_filename_component(PROGRAM_NAME "${INPUT}" NAME_WE)
 
 set(ASM "${OUTPUT_DIR}/${PROGRAM_NAME}.s")
+set(OBJ "${OUTPUT_DIR}/${PROGRAM_NAME}.o")
 
 message(STATUS "JAOT0 compiling ${INPUT}")
 
 execute_process(
-        COMMAND "${JAOT0}"
+        COMMAND
+        "${JAOT0}"
         "${INPUT}"
         -S
         -o "${ASM}"
@@ -45,10 +51,11 @@ endif()
 message(STATUS "Generated ${ASM}")
 
 execute_process(
-        COMMAND "${CMAKE_C_COMPILER}"
+        COMMAND
+        "${CC}"
         -c
         "${ASM}"
-        -o "${OUTPUT_DIR}/${PROGRAM_NAME}.o"
+        -o "${OBJ}"
         RESULT_VARIABLE ASSEMBLE_RESULT
         OUTPUT_VARIABLE ASSEMBLE_OUTPUT
         ERROR_VARIABLE ASSEMBLE_ERROR
