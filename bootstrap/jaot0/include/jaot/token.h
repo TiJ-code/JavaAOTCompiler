@@ -6,7 +6,7 @@
 namespace JAOT {
 
 enum class TokenKind {
-  EndOfLine,
+  EndOfFile,
 
   Identifier,
   Integer,

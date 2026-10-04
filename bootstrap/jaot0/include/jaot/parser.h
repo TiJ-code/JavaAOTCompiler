@@ -3,95 +3,100 @@
 #include "jaot/token.h"
 
 #include <memory>
-#include <stdint>
+#include <cstdint>
 #include <string>
 #include <vector>
 
 namespace JAOT {
+    enum class ExprKind {
+        Integer,
+        Variable,
+        Binary,
+        Call,
+    };
 
-enum class ExprKind {
-  Integer,
-  Variable,
-  Binary,
-  Call,
-};
+    struct Expr {
+        ExprKind kind;
 
-struct Expr {
-  ExprKind kind;
+        int64_t integer = 0;
 
-  int64_t integer = 0;
+        std::string name;
 
-  std::string name;
+        char op = 0;
 
-  char op = 0;
+        std::string callee;
 
-  std::string callee;
+        std::vector<std::unique_ptr<Expr> > arguments;
 
-  std::vector<std::unique_ptr<Expr>> arguments;
+        std::unique_ptr<Expr> left;
+        std::unique_ptr<Expr> right;
+    };
 
-  std::unique_ptr<Expr> left;
-  std::unique_ptr<Expr> right;
-};
+    enum class StmtKind {
+        VarDecl,
+        Expression,
+        Return,
+    };
 
-enum class StmtKind {
-  VarDecl,
-  Expression,
-  Return,
-};
+    struct Stmt {
+        StmtKind kind;
 
-struct Stmt {
-  StmtKind kind;
+        std::string name;
 
-  std::string name;
+        std::unique_ptr<Expr> expression;
+    };
 
-  std::unique_ptr<Expr> expression;
-};
+    struct Method {
+        std::string name;
 
-struct Method {
-  std::string name;
+        std::vector<std::string> parameters;
 
-  std::vector<std::string> parameters;
+        std::vector<Stmt> body;
+    };
 
-  std::vector<Stmt> body;
-};
+    struct Program {
+        std::string className;
 
-struct Program {
-  std::string className;
+        std::vector<Method> methods;
+    };
 
-  std::vector<Method> methods;
-};
+    class Parser {
+    public:
+        explicit Parser(std::vector<Token> tokens);
 
-class Parser {
-public:
-  explicit Parser(std::vector<Token> tokens);
+        Program parse();
 
-  Program parse();
+    private:
+        const Token &current() const;
 
-private:
-  const Token &current() const;
-  const Token &previous() const;
+        const Token &previous() const;
 
-  bool check(TokenKind kind) const;
-  bool match(TokenKind kind);
+        bool check(TokenKind kind) const;
 
-  const Token &consume(TokenKind kind, const char *message);
+        bool match(TokenKind kind);
 
-  Method parseMethod();
+        const Token &consume(TokenKind kind, const char *message);
 
-  Stmt parseStatement();
-  Stmt parseVariableDeclaration();
-  Stmt parseReturn();
+        Method parseMethod();
 
-  std::unique_ptr<Expr> parseExpression();
-  std::unique_ptr<Expr> parseTerm();
-  std::unique_ptr<Expr> parseFactor();
-  std::unique_ptr<Expr> parsePrimary();
+        Stmt parseStatement();
 
-  void error(const std::string &message) const;
+        Stmt parseVariableDeclaration();
 
-  std::vector<Token> tokens_;
+        Stmt parseReturn();
 
-  std::size_t index_ = 0;
-};
+        std::unique_ptr<Expr> parseExpression();
 
+        std::unique_ptr<Expr> parseTerm();
+
+        std::unique_ptr<Expr> parseFactor();
+
+        std::unique_ptr<Expr> parsePrimary();
+
+        void error(const std::string &message) const;
+
+        std::vector<Token> tokens_;
+
+        std::size_t index_ = 0;
+    };
 } // namespace JAOT
