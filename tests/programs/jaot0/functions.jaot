@@ -1,6 +1,10 @@
 class Main {
+    static int add(int a, int b) {
+        return a + b;
+    }
+
     static void main() {
-        int answer = 20 + 22;
+        int answer = add(20, add(10, 12));
         printInt(answer);
     }
 }

@@ -261,7 +261,39 @@ printInt(20 + 22);
 int x = add(10 * 2, 20 + 2);
 ```
 
-## 13. Built-in Runtime Functions
+## 13. Stack Frames and Calling Convention
+
+The initial native backend targets x86-64 System V and uses a frame pointer for
+each method. Each parameter and local variable gets a four-byte stack slot,
+matching the 32-bit `int` type. Parameters occupy slots just like locals; the
+method prologue copies incoming arguments into those slots so that all variable
+references use the same frame-relative addressing.
+
+The frame layout grows down from `%rbp`: the first parameter is stored at
+`-4(%rbp)`, the next parameter at `-8(%rbp)`, followed by local variables.
+Space for every slot is reserved once in the method prologue. The total frame
+allocation is rounded up to a multiple of 16 bytes to preserve the required
+stack alignment for calls.
+
+The prologue saves the caller's frame pointer, establishes the new `%rbp`, and
+reserves the aligned frame allocation. Methods return their integer result in
+`%eax`; the epilogue uses `leave` and `ret` to restore the caller's frame and
+return address.
+
+Integer arguments use the x86-64 System V registers in order: `%rdi`, `%rsi`,
+`%rdx`, `%rcx`, `%r8`, and `%r9`. The callee copies the corresponding 32-bit
+register values into its parameter slots. JAOT0 currently supports at most six
+parameters per method; stack-passed arguments are not implemented.
+
+Call arguments are evaluated from left to right and temporarily pushed so
+evaluating a later argument cannot overwrite an earlier result. The values are
+then moved into the argument registers and the call is emitted. Temporary
+expression pushes are tracked by the code generator, which adds eight bytes of
+padding when needed so the stack is 16-byte aligned immediately before a call.
+The temporary pushes and any call padding do not form part of the method's
+fixed local-variable frame.
+
+## 14. Built-in Runtime Functions
 
 JAOT0 provides a very small runtime interface.
 
@@ -285,7 +317,7 @@ outputs
 
 `printInt` is not a normal JAOT0 method implemented by the program. It is supplied by the native runtime.
 
-## 14. Return Statements
+## 15. Return Statements
 
 A method returning a value uses:
 
@@ -301,7 +333,7 @@ return;
 
 The first implementation may require every non-void method to return a value along every reachable path.
 
-## 15. Statements
+## 16. Statements
 
 The initial statement set is intentionally tiny:
 
@@ -317,7 +349,7 @@ printInt(x);
 return x;
 ```
 
-## 16. Comments
+## 17. Comments
 
 JAOT0 should support normal Java-style comments.
 
@@ -341,7 +373,7 @@ int x = 42;
 
 Comments have no semantic meaning.
 
-## 17. Whitespace
+## 18. Whitespace
 
 Whitespace separates tokens but otherwise has no semantic meaning;
 
@@ -362,7 +394,7 @@ Whitespace includes:
 - newline
 - carriage return
 
-## 18. Identifiers
+## 19. Identifiers
 
 Identifiers are used for:
 
@@ -380,7 +412,7 @@ letter_or_digit*
 
 A digit cannot be the first character.
 
-## 19. Keywords
+## 20. Keywords
 
 Reserved keywords:
 
@@ -394,7 +426,7 @@ return
 
 They cannot be used as identifiers.
 
-## 20. Punctuation
+## 21. Punctuation
 
 JAOT0 uses:
 
@@ -413,7 +445,7 @@ class Main {
 }
 ```
 
-## 21. Complete Minimal Grammar
+## 22. Complete Minimal Grammar
 
 The initial JAOT0 grammar can be described as:
 

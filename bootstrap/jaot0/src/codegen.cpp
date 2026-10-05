@@ -1,19 +1,31 @@
 #include "jaot/codegen.h"
 
-#include <complex>
+#include <array>
+#include <cstddef>
 #include <stdexcept>
 #include <unordered_map>
 
 namespace JAOT {
     namespace {
+        constexpr std::array<const char *, 6> ArgumentRegisters = {
+            "%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"
+        };
+        constexpr std::array<const char *, 6> ArgumentRegisters32 = {
+            "%edi", "%esi", "%edx", "%ecx", "%r8d", "%r9d"
+        };
 
         class FunctionGenerator {
         public:
-            explicit FunctionGenerator(std::ostream &out) : out_(out) {
+            FunctionGenerator(
+                    std::ostream &out,
+                    const std::unordered_map<std::string, std::size_t> &methods
+            ) : out_(out), methods_(methods) {
             }
 
             void generate(const Method &method) {
                 collectLocals(method);
+
+                const int frameSize = (stackSize_ + 15) & ~15;
 
                 out_ << ".text\n";
                 out_ << ".globl jaot_" << method.name << "\n";
@@ -23,8 +35,13 @@ namespace JAOT {
                 out_ << "    pushq %rbp\n";
                 out_ << "    movq %rsp, %rbp\n";
 
-                if (stackSize_ > 0) {
-                    out_ << "    subq $" << stackSize_ << ", %rsp\n";
+                if (frameSize > 0) {
+                    out_ << "    subq $" << frameSize << ", %rsp\n";
+                }
+
+                for (std::size_t i = 0; i < method.parameters.size(); ++i) {
+                    out_ << "    movl " << ArgumentRegisters32[i] << ", "
+                         << localOffset(method.parameters[i]) << "(%rbp)\n";
                 }
 
                 for (const Stmt &statement : method.body) {
@@ -39,20 +56,31 @@ namespace JAOT {
         private:
             static constexpr int LocalSize = 4;
 
+            void allocateLocal(const std::string &name) {
+                if (locals_.contains(name)) {
+                    throw std::runtime_error("duplicate variable: " + name);
+                }
+
+                stackSize_ += LocalSize;
+                locals_.emplace(name, -stackSize_);
+            }
+
             void collectLocals(const Method &method) {
+                if (method.parameters.size() > ArgumentRegisters.size()) {
+                    throw std::runtime_error(
+                        "JAOT0 functions support at most six parameters");
+                }
+
+                for (const std::string &parameter : method.parameters) {
+                    allocateLocal(parameter);
+                }
+
                 for (const Stmt &statement : method.body) {
                     if (statement.kind != StmtKind::VarDecl) {
                         continue;
                     }
 
-                    if (locals_.contains(statement.name)) {
-                        throw std::runtime_error("duplicate variable: " +
-                             statement.name);
-                    }
-
-                    stackSize_ += LocalSize;
-
-                    locals_.emplace(statement.name, -stackSize_);
+                    allocateLocal(statement.name);
                 }
             }
 
@@ -119,11 +147,13 @@ namespace JAOT {
             void generateBinary(const Expr &expression) {
                 generateExpression(*expression.left);
                 out_ << "    pushq %rax\n";
+                stackDepth_ += 8;
 
                 generateExpression(*expression.right);
                 out_ << "    movl %eax, %ecx\n";
 
                 out_ << "    popq %rax\n";
+                stackDepth_ -= 8;
 
                 switch (expression.op) {
                     case '+':
@@ -157,11 +187,46 @@ namespace JAOT {
                     generateExpression(*expression.arguments[0]);
 
                     out_ << "    movl %eax, %edi\n";
-                    out_ << "    call jaot_print_int\n";
+                    emitCall("jaot_print_int");
                     return;
                 }
 
-                throw std::runtime_error("unknown function: " + expression.callee);
+                const auto method = methods_.find(expression.callee);
+                if (method == methods_.end()) {
+                    throw std::runtime_error("unknown function: " + expression.callee);
+                }
+
+                if (expression.arguments.size() != method->second) {
+                    throw std::runtime_error(
+                        "function " + expression.callee + " expects " +
+                        std::to_string(method->second) + " arguments");
+                }
+
+                for (const auto &argument : expression.arguments) {
+                    generateExpression(*argument);
+                    out_ << "    pushq %rax\n";
+                    stackDepth_ += 8;
+                }
+
+                for (std::size_t i = expression.arguments.size(); i > 0; --i) {
+                    out_ << "    popq " << ArgumentRegisters[i - 1] << "\n";
+                    stackDepth_ -= 8;
+                }
+
+                emitCall("jaot_" + expression.callee);
+            }
+
+            void emitCall(const std::string &name) {
+                const bool needsPadding = stackDepth_ % 16 != 0;
+                if (needsPadding) {
+                    out_ << "    subq $8, %rsp\n";
+                }
+
+                out_ << "    call " << name << "\n";
+
+                if (needsPadding) {
+                    out_ << "    addq $8, %rsp\n";
+                }
             }
 
             int localOffset(const std::string &name) const {
@@ -176,9 +241,12 @@ namespace JAOT {
 
             std::ostream &out_;
 
+            const std::unordered_map<std::string, std::size_t> &methods_;
+
             std::unordered_map<std::string, int> locals_;
 
             int stackSize_ = 0;
+            int stackDepth_ = 0;
         };
 
     }
@@ -186,8 +254,20 @@ namespace JAOT {
     void CodeGenerator::generate(const Program &program, std::ostream &out) {
         out << "# generated by jaot0\n\n";
 
+        std::unordered_map<std::string, std::size_t> methods;
         for (const Method &method : program.methods) {
-            FunctionGenerator generator(out);
+            if (method.parameters.size() > ArgumentRegisters.size()) {
+                throw std::runtime_error(
+                    "JAOT0 functions support at most six parameters");
+            }
+
+            if (!methods.emplace(method.name, method.parameters.size()).second) {
+                throw std::runtime_error("duplicate function: " + method.name);
+            }
+        }
+
+        for (const Method &method : program.methods) {
+            FunctionGenerator generator(out, methods);
             generator.generate(method);
             out << '\n';
         }
