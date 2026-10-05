@@ -1,10 +1,37 @@
 #include "jaot/parser.h"
 
+#include <cstdint>
+#include <limits>
 #include <memory>
 #include <stdexcept>
 #include <utility>
 
 namespace JAOT {
+    namespace {
+        int64_t parseIntegerLiteral(const Token &token, bool negative = false) {
+            try {
+                const unsigned long long magnitude = std::stoull(token.text);
+
+                const auto maxPositive = static_cast<unsigned long long>(
+                    std::numeric_limits<int32_t>::max()
+                );
+                const auto maxNegativeMagnitude = maxPositive + 1;
+
+                if (magnitude > (negative ? maxNegativeMagnitude : maxPositive)) {
+                    throw std::out_of_range("integer literal out of range");
+                }
+
+                const int64_t value = static_cast<int64_t>(magnitude);
+                return negative ? -value : value;
+            } catch (const std::out_of_range &) {
+                throw std::runtime_error(
+                    "parser error at " + std::to_string(token.line) + ":" +
+                    std::to_string(token.column) + ": integer literal out of 32-bit range"
+                );
+            }
+        }
+    }
+
     Parser::Parser(std::vector<Token> tokens) : tokens_(std::move(tokens)) {
     }
 
@@ -225,6 +252,21 @@ namespace JAOT {
     std::unique_ptr<Expr> Parser::parseFactor() {
         if (match(TokenKind::Minus)) {
             const Token &minusToken = previous();
+
+            if (match(TokenKind::Integer)) {
+                const Token &integerToken = previous();
+
+                auto expression = std::make_unique<Expr>();
+                expression->kind = ExprKind::Integer;
+                expression->integer = parseIntegerLiteral(integerToken, true);
+                expression->location = {
+                    .line = minusToken.line,
+                    .column = minusToken.column
+                };
+
+                return expression;
+            }
+
             auto expression = std::make_unique<Expr>();
 
             expression->kind = ExprKind::Binary;
@@ -256,7 +298,7 @@ namespace JAOT {
             auto expression = std::make_unique<Expr>();
 
             expression->kind = ExprKind::Integer;
-            expression->integer = std::stoll(previous().text);
+            expression->integer = parseIntegerLiteral(integerToken);
             expression->location = {
                 .line = integerToken.line,
                 .column = integerToken.column

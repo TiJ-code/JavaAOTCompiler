@@ -1,0 +1,6 @@
+class Main {
+    static void main() {
+        printInt(2147483647);
+        printInt(-2147483648);
+    }
+}
