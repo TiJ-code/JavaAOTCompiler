@@ -138,6 +138,11 @@ namespace JAOT {
                         out_ << "    imull %ecx, %eax\n";
                         break;
 
+                    case '/':
+                        out_ << "    cltd\n";
+                        out_ << "    idivl %ecx\n";
+                        break;
+
                     default:
                         throw std::runtime_error("unknown binary operator");
                 }

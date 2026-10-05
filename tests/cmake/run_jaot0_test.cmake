@@ -123,6 +123,18 @@ if(NOT RUN_RESULT EQUAL 0)
     )
 endif()
 
+if(DEFINED EXPECTED_OUTPUT_FILE)
+    file(READ "${EXPECTED_OUTPUT_FILE}" EXPECTED_OUTPUT)
+
+    if(NOT RUN_OUTPUT STREQUAL EXPECTED_OUTPUT)
+        message(FATAL_ERROR
+                "Unexpected output from ${PROGRAM_NAME}\n"
+                "expected:\n${EXPECTED_OUTPUT}"
+                "actual:\n${RUN_OUTPUT}"
+        )
+    endif()
+endif()
+
 message(STATUS "Executed ${PROGRAM_NAME}")
 message(STATUS "Program output:")
 message(STATUS "${RUN_OUTPUT}")

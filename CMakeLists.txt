@@ -76,6 +76,7 @@ add_test(
         ${CMAKE_COMMAND}
         -DJAOT0=$<TARGET_FILE:jaot0>
         -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/hello.jaot
+        -DEXPECTED_OUTPUT_FILE=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/hello.expected
         -DOUTPUT_DIR=${JAOT0_TEST_OUTPUT_DIR}
         -DCXX=${CMAKE_CXX_COMPILER}
         -DRUNTIME=$<TARGET_FILE:jaot_runtime>
@@ -89,6 +90,21 @@ add_test(
         ${CMAKE_COMMAND}
         -DJAOT0=$<TARGET_FILE:jaot0>
         -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/functions.jaot
+        -DEXPECTED_OUTPUT_FILE=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/functions.expected
+        -DOUTPUT_DIR=${JAOT0_TEST_OUTPUT_DIR}
+        -DCXX=${CMAKE_CXX_COMPILER}
+        -DRUNTIME=$<TARGET_FILE:jaot_runtime>
+        -DLAUNCHER=${CMAKE_CURRENT_SOURCE_DIR}/tests/runtime/launcher.cpp
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_test.cmake
+)
+
+add_test(
+        NAME jaot0_compile_division
+        COMMAND
+        ${CMAKE_COMMAND}
+        -DJAOT0=$<TARGET_FILE:jaot0>
+        -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/division.jaot
+        -DEXPECTED_OUTPUT_FILE=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/division.expected
         -DOUTPUT_DIR=${JAOT0_TEST_OUTPUT_DIR}
         -DCXX=${CMAKE_CXX_COMPILER}
         -DRUNTIME=$<TARGET_FILE:jaot_runtime>
@@ -99,6 +115,7 @@ add_test(
 set_tests_properties(
         jaot0_compile_hello
         jaot0_compile_functions
+        jaot0_compile_division
         PROPERTIES
         DEPENDS jaot0_help
 )

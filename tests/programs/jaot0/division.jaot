@@ -1,0 +1,9 @@
+class Main {
+    static void main() {
+        printInt(10 / 3);
+        printInt(-10 / 3);
+        printInt(10 / -3);
+        printInt(-10 / -3);
+        printInt(20 / 2 * 3);
+    }
+}
