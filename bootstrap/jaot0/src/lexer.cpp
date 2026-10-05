@@ -136,6 +136,35 @@ void Lexer::skipWhitespace() {
       continue;
     }
 
+      if (c == '/' && offset_ + 1 < source_.size() &&
+          source_[offset_ + 1] == '*') {
+          const std::size_t commentLine = line_;
+          const std::size_t commentColumn = column_;
+
+          advance();
+          advance();
+
+          while (true) {
+              if (peek() == 0) {
+                  throw std::runtime_error(
+                      "lexer error at " + std::to_string(commentLine) + ":"
+                      + std::to_string(commentColumn) + ": unterminated block comment"
+                  );
+              }
+
+              if (peek() == '*' && offset_ + 1 < source_.size() &&
+                  source_[offset_ + 1] == '/') {
+                  advance();
+                  advance();
+                  break;
+              }
+
+              advance();
+          }
+
+          continue;
+      }
+
     break;
   }
 }

@@ -1,0 +1,10 @@
+class Main {
+    /*
+     * A comment spanning multiple lines
+     */
+    static void main() {
+        int answer = 40 /* comment between tokens */ + 2;
+        // this is a single line comment
+        printInt(answer);
+    }
+}
