@@ -8,6 +8,16 @@
 #include <vector>
 
 namespace JAOT {
+    enum class Type {
+        Int,
+        Void,
+    };
+
+    struct SourceLocation {
+        std::size_t line;
+        std::size_t column;
+    };
+
     enum class ExprKind {
         Integer,
         Variable,
@@ -17,6 +27,7 @@ namespace JAOT {
 
     struct Expr {
         ExprKind kind;
+        SourceLocation location {};
 
         int64_t integer = 0;
 
@@ -40,18 +51,24 @@ namespace JAOT {
 
     struct Stmt {
         StmtKind kind;
+        SourceLocation location {};
 
         std::string name;
-
         std::unique_ptr<Expr> expression;
     };
 
-    struct Method {
+    struct Parameter {
+        Type type;
         std::string name;
+        SourceLocation location {};
+    };
 
-        std::vector<std::string> parameters;
-
+    struct Method {
+        Type returnType;
+        std::string name;
+        std::vector<Parameter> parameters;
         std::vector<Stmt> body;
+        SourceLocation location {};
     };
 
     struct Program {

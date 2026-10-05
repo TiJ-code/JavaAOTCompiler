@@ -62,8 +62,15 @@ namespace JAOT {
     Method Parser::parseMethod() {
         consume(TokenKind::KwStatic, "expected 'static'");
 
-        if (!match(TokenKind::KwVoid) && !match(TokenKind::KwInt)) {
-            error("expected method return type");
+        const auto &returnTypeToken = current();
+        Type returnType;
+
+        if (match(TokenKind::KwVoid)) {
+            returnType = Type::Void;
+        } else if (match(TokenKind::KwInt)) {
+            returnType = Type::Int;
+        } else {
+            error("unexpected method return type");
         }
 
         const auto &name = consume(TokenKind::Identifier, "expected method name");
@@ -72,6 +79,8 @@ namespace JAOT {
 
         Method method;
         method.name = name.text;
+        method.name = name.text;
+        method.location = { .line = returnTypeToken.line, .column = returnTypeToken.column };
 
         if (!check(TokenKind::RParen)) {
             while (true) {
@@ -80,7 +89,11 @@ namespace JAOT {
                 const auto &parameter =
                         consume(TokenKind::Identifier, "expected parameter name");
 
-                method.parameters.push_back(parameter.text);
+                method.parameters.push_back({
+                    .type = Type::Int,
+                    .name = parameter.text,
+                    .location  ={ .line = parameter.line, .column = parameter.column }
+                });
 
                 if (!match(TokenKind::Comma)) {
                     break;
@@ -113,6 +126,7 @@ namespace JAOT {
         Stmt statement;
         statement.kind = StmtKind::Expression;
         statement.expression = parseExpression();
+        statement.location = statement.expression->location;
 
         consume(TokenKind::Semicolon, "expected ';' after expression");
 
@@ -128,6 +142,7 @@ namespace JAOT {
         statement.kind = StmtKind::VarDecl;
         statement.name = name.text;
         statement.expression = parseExpression();
+        statement.location = { .line = name.line, .column =  name.column };
 
         consume(TokenKind::Semicolon, "expected ';' after variable declaration");
 
@@ -135,8 +150,11 @@ namespace JAOT {
     }
 
     Stmt Parser::parseReturn() {
+        const auto &returnToken = previous();
+
         Stmt statement;
         statement.kind = StmtKind::Return;
+        statement.location = { .line = returnToken.line, .column = returnToken.column };
 
         if (!check(TokenKind::Semicolon)) {
             statement.expression = parseExpression();
@@ -214,10 +232,16 @@ namespace JAOT {
 
     std::unique_ptr<Expr> Parser::parsePrimary() {
         if (match(TokenKind::Integer)) {
+            const auto &integerToken = previous();
+
             auto expression = std::make_unique<Expr>();
 
             expression->kind = ExprKind::Integer;
             expression->integer = std::stoll(previous().text);
+            expression->location = {
+                .line = integerToken.line,
+                .column = integerToken.column
+            };
 
             return expression;
         }

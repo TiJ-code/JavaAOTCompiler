@@ -41,7 +41,7 @@ namespace JAOT {
 
                 for (std::size_t i = 0; i < method.parameters.size(); ++i) {
                     out_ << "    movl " << ArgumentRegisters32[i] << ", "
-                         << localOffset(method.parameters[i]) << "(%rbp)\n";
+                         << localOffset(method.parameters[i].name) << "(%rbp)\n";
                 }
 
                 for (const Stmt &statement : method.body) {
@@ -71,8 +71,8 @@ namespace JAOT {
                         "JAOT0 functions support at most six parameters");
                 }
 
-                for (const std::string &parameter : method.parameters) {
-                    allocateLocal(parameter);
+                for (const Parameter &parameter : method.parameters) {
+                    allocateLocal(parameter.name);
                 }
 
                 for (const Stmt &statement : method.body) {
@@ -95,7 +95,11 @@ namespace JAOT {
                         return;
 
                     case StmtKind::Return:
-                        generateExpression(*statement.expression);
+                        if (statement.expression) {
+                            generateExpression(*statement.expression);
+                        } else {
+                            out_ << "    movl $0, %eax\n";
+                        }
                         out_ << "    leave\n";
                         out_ << "    ret\n";
                         return;
