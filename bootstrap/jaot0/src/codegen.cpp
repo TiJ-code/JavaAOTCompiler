@@ -23,6 +23,7 @@ namespace JAOT {
             }
 
             void generate(const Method &method) {
+                methodName_ = method.name;
                 collectLocals(method);
 
                 const int frameSize = (stackSize_ + 15) & ~15;
@@ -173,9 +174,33 @@ namespace JAOT {
                         break;
 
                     case '/':
+                    {
+                        const std::string label =
+                                ".Ljaot_" + methodName_ + "_division_" +
+                                std::to_string(divisionLabelCounter_++);
+                        const std::string normalLabel = label + "_normal";
+                        const std::string overflowLabel = label + "_overflow";
+                        const std::string zeroLabel = label + "_zero";
+                        const std::string doneLabel = label + "_done";
+
+                        out_ << "    testl %ecx, %ecx\n";
+                        out_ << "    je " << zeroLabel << "\n";
+                        out_ << "    cmpl $-1, %ecx\n";
+                        out_ << "    jne " << normalLabel << "\n";
+                        out_ << "    cmpl $-2147483648, %eax\n";
+                        out_ << "    je " << overflowLabel << "\n";
+                        out_ << normalLabel << ":\n";
                         out_ << "    cltd\n";
                         out_ << "    idivl %ecx\n";
+                        out_ << "    jmp " << doneLabel << "\n";
+                        out_ << overflowLabel << ":\n";
+                        out_ << "    movl $-2147483648, %eax\n";
+                        out_ << "    jmp " << doneLabel << "\n";
+                        out_ << zeroLabel << ":\n";
+                        out_ << "    ud2\n";
+                        out_ << doneLabel << ":\n";
                         break;
+                    }
 
                     default:
                         throw std::runtime_error("unknown binary operator");
@@ -251,6 +276,8 @@ namespace JAOT {
 
             int stackSize_ = 0;
             int stackDepth_ = 0;
+            std::string methodName_;
+            std::size_t divisionLabelCounter_ = 0;
         };
 
     }

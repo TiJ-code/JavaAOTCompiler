@@ -131,7 +131,9 @@ Integer literals:
 123456
 ```
 
-The initial implementation should use 32-bit signed integer semantics.
+Integer values use signed 32-bit semantics. The valid literal range is
+`-2147483648` through `2147483647`. Addition, subtraction, and multiplication
+wrap modulo 2^32 when their mathematical result is outside that range.
 
 ## 7.2 `void`
 
@@ -220,6 +222,10 @@ The initial operators are:
 | `-` | subtraction |
 | `*` | multiplication |
 | `/` | integer division |
+
+Integer division truncates toward zero. Dividing by zero terminates the
+program abnormally. The otherwise-overflowing expression
+`-2147483648 / -1` evaluates to `-2147483648`.
 
 ```java
 int a = 10 + 5;

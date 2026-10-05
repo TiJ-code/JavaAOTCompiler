@@ -114,6 +114,20 @@ add_test(
 )
 
 add_test(
+        NAME jaot0_division_by_zero
+        COMMAND
+        ${CMAKE_COMMAND}
+        -DJAOT0=$<TARGET_FILE:jaot0>
+        -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/division_by_zero.jaot
+        -DEXPECT_RUNTIME_FAILURE=ON
+        -DOUTPUT_DIR=${JAOT0_TEST_OUTPUT_DIR}
+        -DCXX=${CMAKE_CXX_COMPILER}
+        -DRUNTIME=$<TARGET_FILE:jaot_runtime>
+        -DLAUNCHER=${CMAKE_CURRENT_SOURCE_DIR}/tests/runtime/launcher.cpp
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_test.cmake
+)
+
+add_test(
         NAME jaot0_semantic_unknown_variable
         COMMAND
         ${CMAKE_COMMAND}

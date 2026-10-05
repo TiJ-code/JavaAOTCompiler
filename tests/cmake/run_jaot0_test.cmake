@@ -114,6 +114,16 @@ execute_process(
         ERROR_VARIABLE RUN_ERROR
 )
 
+if(DEFINED EXPECT_RUNTIME_FAILURE AND EXPECT_RUNTIME_FAILURE)
+    if(RUN_RESULT EQUAL 0)
+        message(FATAL_ERROR
+                "Generated program ${PROGRAM_NAME} was expected to fail at runtime")
+    endif()
+
+    message(STATUS "Generated program failed at runtime as expected")
+    return()
+endif()
+
 if(NOT RUN_RESULT EQUAL 0)
     message(FATAL_ERROR
             "Generated program ${PROGRAM_NAME} failed\n"
