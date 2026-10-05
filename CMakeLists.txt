@@ -22,6 +22,7 @@ target_sources(jaot0
         bootstrap/jaot0/src/lexer.cpp
         bootstrap/jaot0/src/parser.cpp
         bootstrap/jaot0/src/codegen.cpp
+        bootstrap/jaot0/src/semantic.cpp
 )
 
 target_include_directories(jaot0
@@ -110,6 +111,17 @@ add_test(
         -DRUNTIME=$<TARGET_FILE:jaot_runtime>
         -DLAUNCHER=${CMAKE_CURRENT_SOURCE_DIR}/tests/runtime/launcher.cpp
         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_test.cmake
+)
+
+add_test(
+        NAME jaot0_semantic_unknown_variable
+        COMMAND
+        ${CMAKE_COMMAND}
+        -DJAOT0=$<TARGET_FILE:jaot0>
+        -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/missing.jaot
+        -DOUTPUT=${JAOT0_TEST_OUTPUT_DIR}/missing-semantic.s
+        "-DEXPECTED_ERROR=unknown variable: missing"
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_semantic_error.cmake
 )
 
 set_tests_properties(

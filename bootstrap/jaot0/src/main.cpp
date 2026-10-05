@@ -8,6 +8,8 @@
 #include <stdexcept>
 #include <string>
 
+#include "jaot/semantic.h"
+
 namespace {
     void printHelp() {
         std::cout
@@ -96,6 +98,9 @@ int main(int argc, char **argv)
 
         JAOT::Parser parser(tokens);
         const auto program = parser.parse();
+
+        JAOT::SematicAnalyzer sematicAnalyzer;
+        sematicAnalyzer.analyze(program);
 
         if (outputPath.empty()) {
             outputPath = inputPath + ".s";
