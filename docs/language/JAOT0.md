@@ -216,12 +216,12 @@ Expressions can contain:
 
 The initial operators are:
 
-| Operator | Meaning |
-| --- | --- |
-| `+` | addition |
-| `-` | subtraction |
-| `*` | multiplication |
-| `/` | integer division |
+| Operator | Meaning          |
+|----------|------------------|
+| `+`      | addition         |
+| `-`      | subtraction      |
+| `*`      | multiplication   |
+| `/`      | integer division |
 
 Integer division truncates toward zero. Dividing by zero terminates the
 program abnormally. The otherwise-overflowing expression
@@ -413,11 +413,13 @@ Identifiers are used for:
 - parameter names
 - local variable names
 
-The initial syntax is:
+Identifiers use letters, digits, and underscores. An identifier may start
+with a letter or underscore; digits and underscores are also allowed after
+the first character.
 
 ```text
-letter
-letter_or_digit*
+identifier
+    ::= (letter | "_") (letter | digit | "_")* ;
 ```
 
 A digit cannot be the first character.
