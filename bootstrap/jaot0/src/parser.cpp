@@ -78,7 +78,7 @@ namespace JAOT {
         consume(TokenKind::LParen, "expected '(' after method name");
 
         Method method;
-        method.name = name.text;
+        method.returnType = returnType;
         method.name = name.text;
         method.location = { .line = returnTypeToken.line, .column = returnTypeToken.column };
 
@@ -92,7 +92,10 @@ namespace JAOT {
                 method.parameters.push_back({
                     .type = Type::Int,
                     .name = parameter.text,
-                    .location  ={ .line = parameter.line, .column = parameter.column }
+                    .location = {
+                        .line = parameter.line,
+                        .column = parameter.column
+                    }
                 });
 
                 if (!match(TokenKind::Comma)) {
@@ -169,7 +172,8 @@ namespace JAOT {
         auto left = parseTerm();
 
         while (check(TokenKind::Plus) || check(TokenKind::Minus)) {
-            const char op = current().text[0];
+            const Token &operatorToken = current();
+            const char op = operatorToken.text[0];
             ++index_;
 
             auto right = parseTerm();
@@ -178,6 +182,10 @@ namespace JAOT {
 
             expression->kind = ExprKind::Binary;
             expression->op = op;
+            expression->location = {
+                .line = operatorToken.line,
+                .column = operatorToken.column
+            };
             expression->left = std::move(left);
             expression->right = std::move(right);
 
@@ -191,7 +199,8 @@ namespace JAOT {
         auto left = parseFactor();
 
         while (check(TokenKind::Star) || check(TokenKind::Slash)) {
-            const char op = current().text[0];
+            const Token &operatorToken = current();
+            const char op = operatorToken.text[0];
             ++index_;
 
             auto right = parseFactor();
@@ -200,6 +209,10 @@ namespace JAOT {
 
             expression->kind = ExprKind::Binary;
             expression->op = op;
+            expression->location = {
+                .line = operatorToken.line,
+                .column = operatorToken.column
+            };
             expression->left = std::move(left);
             expression->right = std::move(right);
 
@@ -211,15 +224,21 @@ namespace JAOT {
 
     std::unique_ptr<Expr> Parser::parseFactor() {
         if (match(TokenKind::Minus)) {
+            const Token &minusToken = previous();
             auto expression = std::make_unique<Expr>();
 
             expression->kind = ExprKind::Binary;
             expression->op = '-';
+            expression->location = {
+                .line = minusToken.line,
+                .column = minusToken.column
+            };
 
             auto zero = std::make_unique<Expr>();
 
             zero->kind = ExprKind::Integer;
             zero->integer = 0;
+            zero->location = expression->location;
 
             expression->left = std::move(zero);
             expression->right = parseFactor();
@@ -247,13 +266,18 @@ namespace JAOT {
         }
 
         if (match(TokenKind::Identifier)) {
-            const std::string name = previous().text;
+            const Token &identifier = previous();
+            const std::string name = identifier.text;
 
             if (!match(TokenKind::LParen)) {
                 auto expression = std::make_unique<Expr>();
 
                 expression->kind = ExprKind::Variable;
                 expression->name = name;
+                expression->location = {
+                    .line = identifier.line,
+                    .column = identifier.column
+                };
 
                 return expression;
             }
@@ -262,6 +286,10 @@ namespace JAOT {
 
             expression->kind = ExprKind::Call;
             expression->callee = name;
+            expression->location = {
+                .line = identifier.line,
+                .column = identifier.column
+            };
 
             if (!check(TokenKind::RParen)) {
                 while (true) {
