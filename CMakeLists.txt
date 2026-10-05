@@ -125,6 +125,17 @@ add_test(
 )
 
 add_test(
+        NAME jaot0_semantic_missing_return
+        COMMAND
+        ${CMAKE_COMMAND}
+        -DJAOT0=$<TARGET_FILE:jaot0>
+        -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/missing_return.jaot
+        -DOUTPUT=${JAOT0_TEST_OUTPUT_DIR}/missing-return.s
+        "-DEXPECTED_ERROR=int method must return a value"
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_semantic_error.cmake
+)
+
+add_test(
         NAME jaot0_compile_comments
         COMMAND
         ${CMAKE_COMMAND}

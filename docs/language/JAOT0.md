@@ -331,7 +331,11 @@ A `void` method may use:
 return;
 ```
 
-The first implementation may require every non-void method to return a value along every reachable path.
+Every `int` method must return an `int` value on every reachable path. The
+current JAOT0 version has no conditional or loop statements, so an `int` method
+must contain a return statement; otherwise, execution could reach the end
+without producing a value. A `void` method may either return with `return;` or
+reach the end of its body.
 
 ## 16. Statements
 
@@ -470,7 +474,7 @@ parameter-list
     ::= parameter ("," parameter)* ;
     
 parameter
-    ::= type identifier ;
+    ::= "int" identifier ;
     
 type
     ::= "int"

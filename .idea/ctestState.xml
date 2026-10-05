@@ -12,6 +12,7 @@
       <lineNumber testId="path:CMakeLists.txt test:jaot0_semantic_integer_bounds" value="162" />
       <lineNumber testId="path:CMakeLists.txt test:jaot0_semantic_invalid_main_signature" value="151" />
       <lineNumber testId="path:CMakeLists.txt test:jaot0_semantic_missing_main" value="140" />
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_semantic_missing_return" value="126" />
       <lineNumber testId="path:CMakeLists.txt test:jaot0_semantic_unknown_variable" value="115" />
     </ctestState>
   </component>

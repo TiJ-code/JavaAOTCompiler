@@ -111,7 +111,7 @@ namespace JAOT {
                 }
             }
 
-            bool hasReturn = false;
+            bool canFallThrough = true;
 
             for (const Stmt &statement : method.body) {
                 switch (statement.kind) {
@@ -140,7 +140,7 @@ namespace JAOT {
                         break;
 
                     case StmtKind::Return:
-                        hasReturn = true;
+                        canFallThrough = false;
 
                         if (method.returnType == Type::Void) {
                             if (statement.expression) {
@@ -166,7 +166,7 @@ namespace JAOT {
                 }
             }
 
-            if (method.returnType == Type::Int && !hasReturn) {
+            if (method.returnType == Type::Int && canFallThrough) {
                 semanticError(method.location, "int method must return a value");
             }
         }
