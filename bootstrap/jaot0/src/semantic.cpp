@@ -191,6 +191,21 @@ namespace JAOT {
             }
         }
 
+        const auto entryPoint = methods.find("main");
+        if (entryPoint == methods.end()) {
+            throw std::runtime_error(
+                "semantic error: missing required entry point 'main' (expected static void main())"
+            );
+        }
+
+        const Method &mainMethod = *entryPoint->second;
+        if (mainMethod.returnType != Type::Void || !mainMethod.parameters.empty()) {
+            semanticError(
+                mainMethod.location,
+                "entry point 'main' must have signature 'static void main()'"
+            );
+        }
+
         for (const Method &method : program.methods) {
             checkMethod(method, methods);
         }

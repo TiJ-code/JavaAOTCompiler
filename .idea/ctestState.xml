@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CidrCTestProjectState">
+    <ctestState>
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_compile_comments" value="126" />
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_compile_division" value="101" />
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_compile_functions" value="87" />
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_compile_hello" value="73" />
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_help" value="64" />
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_semantic_invalid_main_signature" value="151" />
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_semantic_missing_main" value="140" />
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_semantic_unknown_variable" value="115" />
+    </ctestState>
+  </component>
+</project>

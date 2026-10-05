@@ -138,6 +138,28 @@ add_test(
         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_test.cmake
 )
 
+add_test(
+        NAME jaot0_semantic_missing_main
+        COMMAND
+        ${CMAKE_COMMAND}
+        -DJAOT0=$<TARGET_FILE:jaot0>
+        -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/missing_main.jaot
+        -DOUTPUT=${JAOT0_TEST_OUTPUT_DIR}/missing-main-semantic.s
+        "-DEXPECTED_ERROR=missing required entry point 'main' (expected static void main())"
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_semantic_error.cmake
+)
+
+add_test(
+        NAME jaot0_semantic_invalid_main_signature
+        COMMAND
+        ${CMAKE_COMMAND}
+        -DJAOT0=$<TARGET_FILE:jaot0>
+        -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/invalid_main_signature.jaot
+        -DOUTPUT=${JAOT0_TEST_OUTPUT_DIR}/invalid-main-signature-semantic.s
+        "-DEXPECTED_ERROR=entry point 'main' must have signature 'static void main()'"
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_semantic_error.cmake
+)
+
 set_tests_properties(
         jaot0_compile_hello
         jaot0_compile_functions
