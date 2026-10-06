@@ -172,25 +172,26 @@ int answer;
 
 ## 9. Assignment
 
-The initial JAOT0 language may support assignment:
+Local variables and method parameters are mutable. A local variable must still
+be initialized when it is declared; after its declaration, it may be assigned
+a new value:
 
 ```java
-int x = 42;
+int count = 0;
+count = count + 1;
 ```
 
-However, I recommend that the first JAOT0 subset initially only support initialization:
-
-```java
-int x = 42;
-```
-
-and postpone reassignment until the semantic/IR layer is ready.
-
-That keeps the first compiler significantly simpler.
+An assignment is a statement, not an expression. Its target must name a
+parameter or local variable that has already been declared in the method.
+Assignment does not declare a new variable, and fields and global variables
+are not supported.
 
 ```text
-variable declaration:
+variable-declaration:
     int Identifier = expression ;
+
+assignment-statement:
+    Identifier = expression ;
 ```
 
 ## 10. Expressions
@@ -495,11 +496,15 @@ block
         
 statement
     ::= variable-declaration
+      | assignment-statement
       | expression-statement
       | return-statement;
       
 variable-declaration
     ::= "int" identifier "=" expression ";" ;
+
+assignment-statement
+    ::= identifier "=" expression ";" ;
     
 expression-statement
     ::= expression ";" ;
