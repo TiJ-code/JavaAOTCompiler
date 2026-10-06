@@ -2,6 +2,6 @@ class Main {
     static void main() {
         int x;
         x = 42;
-        printInt(42);
+        printInt(x);
     }
 }

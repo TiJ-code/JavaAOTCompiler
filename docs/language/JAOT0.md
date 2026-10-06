@@ -162,19 +162,23 @@ String
 
 ## 8. Variables
 
-Local variables can be declared inside methods.
-Variables must be initialized when declared.
+Local variables can be declared inside methods. They may be declared with or
+without an initializer:
 
-Therefore this is not valid JAOT0:
 ```java
 int answer;
+int initialized = 42;
 ```
+
+A variable declared without an initializer must be assigned before it is
+read. Reading it earlier is a semantic error. Method parameters are initialized
+when the method is called.
 
 ## 9. Assignment
 
-Local variables and method parameters are mutable. A local variable must still
-be initialized when it is declared; after its declaration, it may be assigned
-a new value:
+Local variables and method parameters are mutable. An assignment updates a
+previously declared variable; it does not declare a new one. Assignment is a
+statement, not an expression:
 
 ```java
 int count = 0;
