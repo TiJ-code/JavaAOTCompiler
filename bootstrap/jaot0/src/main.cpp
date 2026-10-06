@@ -1,4 +1,5 @@
 #include "jaot/codegen.h"
+#include "jaot/ir_lowering.h"
 #include "jaot/lexer.h"
 #include "jaot/parser.h"
 
@@ -102,6 +103,9 @@ int main(int argc, char **argv)
         JAOT::SematicAnalyzer sematicAnalyzer;
         sematicAnalyzer.analyze(program);
 
+        JAOT::IrLowerer irLowerer;
+        const JAOT::IR::Program irProgram = irLowerer.lower(program);
+
         if (outputPath.empty()) {
             outputPath = inputPath + ".s";
         }
@@ -113,7 +117,7 @@ int main(int argc, char **argv)
         }
 
         JAOT::CodeGenerator generator;
-        generator.generate(program, output);
+        generator.generate(irProgram, output);
 
         std::cout
             << "wrote "

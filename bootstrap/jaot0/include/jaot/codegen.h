@@ -1,12 +1,12 @@
 #pragma once
 
-#include "jaot/parser.h"
+#include "jaot/ir.h"
 
 #include <ostream>
 
 namespace JAOT {
     class CodeGenerator {
     public:
-        void generate(const Program &program, std::ostream &out);
+        void generate(const IR::Program &program, std::ostream &out);
     };
 } // namespace JAOT

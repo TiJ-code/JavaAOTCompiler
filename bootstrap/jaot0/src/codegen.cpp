@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <stdexcept>
+#include <string>
 #include <unordered_map>
 
 namespace JAOT {
@@ -22,7 +23,7 @@ namespace JAOT {
             ) : out_(out), methods_(methods) {
             }
 
-            void generate(const Method &method) {
+            void generate(const IR::Method &method) {
                 methodName_ = method.name;
                 collectLocals(method);
 
@@ -30,9 +31,8 @@ namespace JAOT {
 
                 out_ << ".text\n";
                 out_ << ".globl jaot_" << method.name << "\n";
-                out_ << ".type jaot_" << method.name << ", @function \n";
+                out_ << ".type jaot_" << method.name << ", @function\n";
                 out_ << "jaot_" << method.name << ":\n";
-
                 out_ << "    pushq %rbp\n";
                 out_ << "    movq %rsp, %rbp\n";
 
@@ -40,12 +40,17 @@ namespace JAOT {
                     out_ << "    subq $" << frameSize << ", %rsp\n";
                 }
 
-                for (std::size_t i = 0; i < method.parameters.size(); ++i) {
-                    out_ << "    movl " << ArgumentRegisters32[i] << ", "
-                         << localOffset(method.parameters[i].name) << "(%rbp)\n";
+                if (method.parameters.size() > ArgumentRegisters32.size()) {
+                    throw std::runtime_error(
+                        "JAOT0 functions support at most six parameters");
                 }
 
-                for (const Stmt &statement : method.body) {
+                for (std::size_t i = 0; i < method.parameters.size(); ++i) {
+                    out_ << "    movl " << ArgumentRegisters32[i] << ", "
+                         << localOffset(method.parameters[i]) << "(%rbp)\n";
+                }
+
+                for (const IR::Statement &statement : method.statements) {
                     generateStatement(statement);
                 }
 
@@ -57,52 +62,45 @@ namespace JAOT {
         private:
             static constexpr int LocalSize = 4;
 
-            void allocateLocal(const std::string &name) {
-                if (locals_.contains(name)) {
-                    throw std::runtime_error("duplicate variable: " + name);
-                }
-
-                stackSize_ += LocalSize;
-                locals_.emplace(name, -stackSize_);
-            }
-
-            void collectLocals(const Method &method) {
-                if (method.parameters.size() > ArgumentRegisters.size()) {
-                    throw std::runtime_error(
-                        "JAOT0 functions support at most six parameters");
-                }
-
-                for (const Parameter &parameter : method.parameters) {
-                    allocateLocal(parameter.name);
-                }
-
-                for (const Stmt &statement : method.body) {
-                    if (statement.kind != StmtKind::VarDecl) {
-                        continue;
+            void collectLocals(const IR::Method &method) {
+                for (const IR::Local &local : method.locals) {
+                    const int offset = -stackSize_ - LocalSize;
+                    if (!locals_.emplace(local.id, offset).second) {
+                        throw std::runtime_error("duplicate IR local id");
                     }
+                    stackSize_ += LocalSize;
+                }
 
-                    allocateLocal(statement.name);
+                for (const IR::LocalId parameter : method.parameters) {
+                    if (!locals_.contains(parameter)) {
+                        throw std::runtime_error(
+                            "method parameter has no IR local slot");
+                    }
                 }
             }
 
-            void generateStatement(const Stmt &statement) {
+            void generateStatement(const IR::Statement &statement) {
                 switch (statement.kind) {
-                    case StmtKind::VarDecl:
-                        generateVariableDeclaration(statement);
-                        return;
-
-                    case StmtKind::Assignment:
+                    case IR::StatementKind::AssignLocal:
+                        if (!statement.expression) {
+                            throw std::runtime_error(
+                                "IR local assignment without value");
+                        }
                         generateExpression(*statement.expression);
-                        out_ << "    mov %eax, "
-                             << localOffset(statement.name)
+                        out_ << "    movl %eax, "
+                             << localOffset(statement.target)
                              << "(%rbp)\n";
                         return;
 
-                    case StmtKind::Expression:
+                    case IR::StatementKind::Evaluate:
+                        if (!statement.expression) {
+                            throw std::runtime_error(
+                                "IR expression statement without expression");
+                        }
                         generateExpression(*statement.expression);
                         return;
 
-                    case StmtKind::Return:
+                    case IR::StatementKind::Return:
                         if (statement.expression) {
                             generateExpression(*statement.expression);
                         } else {
@@ -113,61 +111,48 @@ namespace JAOT {
                         return;
                 }
 
-                throw std::runtime_error("unknown statement kind");
+                throw std::runtime_error("unknown IR statement kind");
             }
 
-            void generateVariableDeclaration(const Stmt &statement) {
-                if (!statement.expression) {
-                    return;
-                }
-
-                generateExpression(*statement.expression);
-
-                const int offset = localOffset(statement.name);
-
-                out_ << "    movl %eax, " << offset << "(%rbp)\n";
-            }
-
-            void generateExpression(const Expr &expression) {
+            void generateExpression(const IR::Expr &expression) {
                 switch (expression.kind) {
-                    case ExprKind::Integer:
-                        out_ << "    movl $" << expression.integer << ", %eax\n";
+                    case IR::ExprKind::Integer:
+                        out_ << "    movl $" << expression.integer
+                             << ", %eax\n";
                         return;
 
-                    case ExprKind::Binary:
+                    case IR::ExprKind::Local:
+                        out_ << "    movl " << localOffset(expression.local)
+                             << "(%rbp), %eax\n";
+                        return;
+
+                    case IR::ExprKind::Binary:
+                        if (!expression.left || !expression.right) {
+                            throw std::runtime_error(
+                                "incomplete IR binary expression");
+                        }
                         generateBinary(expression);
                         return;
 
-                    case ExprKind::Call:
+                    case IR::ExprKind::Call:
                         generateCall(expression);
-                        return;
-
-                    case ExprKind::Variable:
-                        generateVariable(expression);
                         return;
                 }
 
-                throw std::runtime_error("unknown expression kind");
+                throw std::runtime_error("unknown IR expression kind");
             }
 
-            void generateVariable(const Expr &expression) {
-                const int offset = localOffset(expression.name);
-
-                out_ << "    movl " << offset << "(%rbp), %eax\n";
-            }
-
-            void generateBinary(const Expr &expression) {
+            void generateBinary(const IR::Expr &expression) {
                 generateExpression(*expression.left);
                 out_ << "    pushq %rax\n";
                 stackDepth_ += 8;
 
                 generateExpression(*expression.right);
                 out_ << "    movl %eax, %ecx\n";
-
                 out_ << "    popq %rax\n";
                 stackDepth_ -= 8;
 
-                switch (expression.op) {
+                switch (expression.binaryOperator) {
                     case '+':
                         out_ << "    addl %ecx, %eax\n";
                         break;
@@ -180,13 +165,13 @@ namespace JAOT {
                         out_ << "    imull %ecx, %eax\n";
                         break;
 
-                    case '/':
-                    {
+                    case '/': {
                         const std::string label =
                                 ".Ljaot_" + methodName_ + "_division_" +
                                 std::to_string(divisionLabelCounter_++);
                         const std::string normalLabel = label + "_normal";
-                        const std::string overflowLabel = label + "_overflow";
+                        const std::string overflowLabel =
+                                label + "_overflow";
                         const std::string zeroLabel = label + "_zero";
                         const std::string doneLabel = label + "_done";
 
@@ -210,18 +195,19 @@ namespace JAOT {
                     }
 
                     default:
-                        throw std::runtime_error("unknown binary operator");
+                        throw std::runtime_error(
+                            "unknown IR binary operator");
                 }
             }
 
-            void generateCall(const Expr &expression) {
+            void generateCall(const IR::Expr &expression) {
                 if (expression.callee == "printInt") {
                     if (expression.arguments.size() != 1) {
-                        throw std::runtime_error("printInt expects one argument");
+                        throw std::runtime_error(
+                            "printInt expects one argument");
                     }
 
                     generateExpression(*expression.arguments[0]);
-
                     out_ << "    movl %eax, %edi\n";
                     emitCall("jaot_print_int");
                     return;
@@ -229,13 +215,19 @@ namespace JAOT {
 
                 const auto method = methods_.find(expression.callee);
                 if (method == methods_.end()) {
-                    throw std::runtime_error("unknown function: " + expression.callee);
+                    throw std::runtime_error(
+                        "unknown function: " + expression.callee);
                 }
 
                 if (expression.arguments.size() != method->second) {
                     throw std::runtime_error(
                         "function " + expression.callee + " expects " +
                         std::to_string(method->second) + " arguments");
+                }
+
+                if (expression.arguments.size() > ArgumentRegisters.size()) {
+                    throw std::runtime_error(
+                        "JAOT0 functions support at most six arguments");
                 }
 
                 for (const auto &argument : expression.arguments) {
@@ -265,49 +257,39 @@ namespace JAOT {
                 }
             }
 
-            int localOffset(const std::string &name) const {
-                const auto it = locals_.find(name);
-
-                if (it == locals_.end()) {
-                    throw std::runtime_error("unknown variable: " + name);
+            int localOffset(IR::LocalId id) const {
+                const auto found = locals_.find(id);
+                if (found == locals_.end()) {
+                    throw std::runtime_error("unknown IR local id");
                 }
 
-                return it->second;
+                return found->second;
             }
 
             std::ostream &out_;
-
             const std::unordered_map<std::string, std::size_t> &methods_;
-
-            std::unordered_map<std::string, int> locals_;
-
+            std::unordered_map<IR::LocalId, int> locals_;
             int stackSize_ = 0;
             int stackDepth_ = 0;
             std::string methodName_;
             std::size_t divisionLabelCounter_ = 0;
         };
-
     }
 
-    void CodeGenerator::generate(const Program &program, std::ostream &out) {
+    void CodeGenerator::generate(const IR::Program &program, std::ostream &out) {
         out << "# generated by jaot0\n\n";
 
         std::unordered_map<std::string, std::size_t> methods;
-        for (const Method &method : program.methods) {
-            if (method.parameters.size() > ArgumentRegisters.size()) {
-                throw std::runtime_error(
-                    "JAOT0 functions support at most six parameters");
-            }
-
+        for (const IR::Method &method : program.methods) {
             if (!methods.emplace(method.name, method.parameters.size()).second) {
                 throw std::runtime_error("duplicate function: " + method.name);
             }
         }
 
-        for (const Method &method : program.methods) {
+        for (const IR::Method &method : program.methods) {
             FunctionGenerator generator(out, methods);
             generator.generate(method);
             out << '\n';
         }
     }
-}
+} // namespace JAOT

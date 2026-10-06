@@ -2,23 +2,6 @@
 <project version="4">
   <component name="CidrCTestProjectState">
     <ctestState>
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_compile_assignment" value="101" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_compile_comments" value="201" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_compile_declaration_assignment" value="115" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_compile_division" value="140" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_compile_functions" value="87" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_compile_hello" value="73" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_compile_integer_bounds" value="259" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_division_by_zero" value="154" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_help" value="64" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_semantic_assignment_unknown_variable" value="179" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_semantic_integer_below_bounds" value="248" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_semantic_integer_bounds" value="237" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_semantic_invalid_main_signature" value="226" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_semantic_missing_main" value="215" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_semantic_missing_return" value="190" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_semantic_uninitialized_variable" value="129" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_semantic_unknown_variable" value="168" />
       <lineNumber testId="path:null test:jaot0_compile_assignment" value="101" />
       <lineNumber testId="path:null test:jaot0_compile_comments" value="176" />
       <lineNumber testId="path:null test:jaot0_compile_division" value="115" />

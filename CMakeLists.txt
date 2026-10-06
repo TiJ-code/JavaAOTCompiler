@@ -14,7 +14,10 @@ option(JAOT_WARNINGS_AS_ERRORS
         OFF
 )
 
-add_executable(jaot0)
+add_executable(jaot0
+        bootstrap/jaot0/include/jaot/ir.h
+        bootstrap/jaot0/include/jaot/ir_lowering.h
+        bootstrap/jaot0/src/ir_lowering.cpp)
 
 target_sources(jaot0
         PRIVATE
