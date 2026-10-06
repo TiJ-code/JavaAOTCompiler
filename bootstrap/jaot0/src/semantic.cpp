@@ -135,6 +135,26 @@ namespace JAOT {
                         break;
                     }
 
+                    case StmtKind::Assignment: {
+                        if (!locals.contains(statement.name)) {
+                            semanticError(
+                                statement.location,
+                                "unknown variable: " + statement.name
+                            );
+                        }
+
+                        const Type valueType = checkExpression(*statement.expression, locals, methods);
+
+                        if (valueType != Type::Int) {
+                            semanticError(
+                                statement.expression->location,
+                                "assignment value must have type int"
+                            );
+                        }
+
+                        break;
+                    }
+
                     case StmtKind::Expression:
                         checkExpression(*statement.expression, locals, methods);
                         break;

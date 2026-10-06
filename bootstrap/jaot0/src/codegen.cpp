@@ -91,6 +91,13 @@ namespace JAOT {
                         generateVariableDeclaration(statement);
                         return;
 
+                    case StmtKind::Assignment:
+                        generateExpression(*statement.expression);
+                        out_ << "    mov %eax, "
+                             << localOffset(statement.name)
+                             << "(%rbp)\n";
+                        return;
+
                     case StmtKind::Expression:
                         generateExpression(*statement.expression);
                         return;

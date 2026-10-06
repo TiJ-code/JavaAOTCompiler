@@ -45,6 +45,7 @@ namespace JAOT {
 
     enum class StmtKind {
         VarDecl,
+        Assignment,
         Expression,
         Return,
     };
@@ -99,6 +100,8 @@ namespace JAOT {
         Stmt parseStatement();
 
         Stmt parseVariableDeclaration();
+
+        Stmt parseAssignment();
 
         Stmt parseReturn();
 

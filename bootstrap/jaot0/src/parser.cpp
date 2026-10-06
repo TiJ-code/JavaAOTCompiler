@@ -153,6 +153,12 @@ namespace JAOT {
             return parseReturn();
         }
 
+        if (check(TokenKind::Identifier) &&
+            index_ + 1 < tokens_.size() &&
+            tokens_[index_ + 1].kind == TokenKind::Equal) {
+            return parseAssignment();
+        }
+
         Stmt statement;
         statement.kind = StmtKind::Expression;
         statement.expression = parseExpression();
@@ -175,6 +181,25 @@ namespace JAOT {
         statement.location = { .line = name.line, .column =  name.column };
 
         consume(TokenKind::Semicolon, "expected ';' after variable declaration");
+
+        return statement;
+    }
+
+    Stmt Parser::parseAssignment() {
+        const auto &name = consume(TokenKind::Identifier, "expected variable name in assignment");
+
+        consume(TokenKind::Equal, "expected '=' in assignment");
+
+        Stmt statement;
+        statement.kind = StmtKind::Assignment;
+        statement.name = name.text;
+        statement.location = {
+            .line = name.line,
+            .column = name.column
+        };
+        statement.expression = parseExpression();
+
+        consume(TokenKind::Semicolon, "expected ';' after assignment");
 
         return statement;
     }
