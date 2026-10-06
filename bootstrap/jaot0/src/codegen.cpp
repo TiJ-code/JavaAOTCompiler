@@ -118,7 +118,7 @@ namespace JAOT {
 
             void generateVariableDeclaration(const Stmt &statement) {
                 if (!statement.expression) {
-                    throw std::runtime_error("variable declaration without initializer: " + statement.name);
+                    return;
                 }
 
                 generateExpression(*statement.expression);

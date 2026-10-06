@@ -16,7 +16,7 @@ namespace JAOT {
                 + ": " + message);
         }
 
-        Type checkExpression(const Expr &expression, const LocalNames &locals, const MethodTable &methods) {
+        Type checkExpression(const Expr &expression, const LocalNames &locals, const LocalNames &initialized, const MethodTable &methods) {
             switch (expression.kind) {
                 case ExprKind::Integer:
                     return Type::Int;
@@ -27,13 +27,18 @@ namespace JAOT {
                             expression.location,
                             "unknown variable: " + expression.name);
                     }
+                    if (!initialized.contains(expression.name)) {
+                        semanticError(
+                            expression.location,
+                            "variable used before initialization: " + expression.name);
+                    }
                     return Type::Int;
 
                 case ExprKind::Binary: {
                     const Type left =
-                            checkExpression(*expression.left, locals, methods);
+                            checkExpression(*expression.left, locals, initialized, methods);
                     const Type right =
-                            checkExpression(*expression.right, locals, methods);
+                            checkExpression(*expression.right, locals, initialized, methods);
 
                     if (left != Type::Int || right != Type::Int) {
                         semanticError(
@@ -51,8 +56,8 @@ namespace JAOT {
                                 "printInt expects one argument");
                         }
 
-                        const Type argument = checkExpression(
-                            *expression.arguments[0], locals, methods);
+                        const Type argument = checkExpression(*expression.arguments[0], locals, initialized, methods);
+
                         if (argument != Type::Int) {
                             semanticError(
                                 expression.arguments[0]->location,
@@ -81,8 +86,7 @@ namespace JAOT {
                          i < expression.arguments.size();
                          ++i) {
                         const Expr &argument = *expression.arguments[i];
-                        const Type argumentType =
-                                checkExpression(argument, locals, methods);
+                        const Type argumentType = checkExpression(argument, locals, initialized, methods);
 
                         if (argumentType != callee.parameters[i].type) {
                             semanticError(
@@ -101,6 +105,7 @@ namespace JAOT {
 
         void checkMethod(const Method &method, const MethodTable &methods) {
             LocalNames locals;
+            LocalNames initialized;
 
             for (const Parameter &parameter : method.parameters) {
                 if (!locals.insert(parameter.name).second) {
@@ -109,6 +114,7 @@ namespace JAOT {
                         "duplicate parameter: " + parameter.name
                         );
                 }
+                initialized.insert(parameter.name);
             }
 
             bool canFallThrough = true;
@@ -119,16 +125,23 @@ namespace JAOT {
                         if (locals.contains(statement.name)) {
                             semanticError(
                                 statement.location,
-                                "duplicate variable: " + statement.name
-                            );
+                                "duplicate variable: " + statement.name);
                         }
 
-                        const Type initializerType = checkExpression(*statement.expression, locals, methods);
-                        if (initializerType != Type::Int) {
-                            semanticError(
-                                statement.location,
-                                "variable initializer must have type int"
-                            );
+                        if (statement.expression) {
+                            const Type initializerType = checkExpression(
+                                *statement.expression,
+                                locals,
+                                initialized,
+                                methods);
+
+                            if (initializerType != Type::Int) {
+                                semanticError(
+                                    statement.expression->location,
+                                    "variable initializer must have type int");
+                            }
+
+                            initialized.insert(statement.name);
                         }
 
                         locals.insert(statement.name);
@@ -143,7 +156,7 @@ namespace JAOT {
                             );
                         }
 
-                        const Type valueType = checkExpression(*statement.expression, locals, methods);
+                        const Type valueType = checkExpression(*statement.expression, locals, initialized, methods);
 
                         if (valueType != Type::Int) {
                             semanticError(
@@ -152,11 +165,13 @@ namespace JAOT {
                             );
                         }
 
+                        initialized.insert(statement.name);
+
                         break;
                     }
 
                     case StmtKind::Expression:
-                        checkExpression(*statement.expression, locals, methods);
+                        checkExpression(*statement.expression, locals, initialized, methods);
                         break;
 
                     case StmtKind::Return:
@@ -177,7 +192,7 @@ namespace JAOT {
                                 );
                             }
 
-                            const Type returnType = checkExpression(*statement.expression, locals, methods);
+                            const Type returnType = checkExpression(*statement.expression, locals, initialized, methods);
                             if (returnType != Type::Int) {
                                 semanticError(statement.expression->location, "return expression must have type int");
                             }

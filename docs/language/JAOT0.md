@@ -501,7 +501,7 @@ statement
       | return-statement;
       
 variable-declaration
-    ::= "int" identifier "=" expression ";" ;
+    ::= "int" identifier ("=" expression)? ";" ;
 
 assignment-statement
     ::= identifier "=" expression ";" ;

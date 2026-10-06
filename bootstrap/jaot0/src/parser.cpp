@@ -172,13 +172,14 @@ namespace JAOT {
     Stmt Parser::parseVariableDeclaration() {
         const auto &name = consume(TokenKind::Identifier, "expected variable name");
 
-        consume(TokenKind::Equal, "expected '=' in variable declaration");
-
         Stmt statement;
         statement.kind = StmtKind::VarDecl;
         statement.name = name.text;
-        statement.expression = parseExpression();
         statement.location = { .line = name.line, .column =  name.column };
+
+        if (match(TokenKind::Equal)) {
+            statement.expression = parseExpression();
+        }
 
         consume(TokenKind::Semicolon, "expected ';' after variable declaration");
 
