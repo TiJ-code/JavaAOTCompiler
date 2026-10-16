@@ -147,6 +147,10 @@ namespace JAOT {
                              << ", %eax\n";
                         return;
 
+                    case IR::ExprKind::Boolean:
+                        out_ << "    movl $" << (expression.boolean ? 1 : 0) << ", %eax\n";
+                        return;
+
                     case IR::ExprKind::Local:
                         out_ << "    movl " << localOffset(expression.local)
                              << "(%rbp), %eax\n";
@@ -178,51 +182,52 @@ namespace JAOT {
                 out_ << "    popq %rax\n";
                 stackDepth_ -= 8;
 
-                switch (expression.binaryOperator) {
-                    case '+':
-                        out_ << "    addl %ecx, %eax\n";
-                        break;
-
-                    case '-':
-                        out_ << "    subl %ecx, %eax\n";
-                        break;
-
-                    case '*':
-                        out_ << "    imull %ecx, %eax\n";
-                        break;
-
-                    case '/': {
-                        const std::string label =
+                if (expression.binaryOperator == "+") {
+                    out_ << "    addl %ecx, %eax\n";
+                } else if (expression.binaryOperator == "-") {
+                    out_ << "    subl %ecx, %eax\n";
+                } else if (expression.binaryOperator == "*") {
+                    out_ << "    imull %ecx, %eax\n";
+                } else if (expression.binaryOperator == "/") {
+                    const std::string label =
                                 ".Ljaot_" + methodName_ + "_division_" +
                                 std::to_string(divisionLabelCounter_++);
-                        const std::string normalLabel = label + "_normal";
-                        const std::string overflowLabel =
-                                label + "_overflow";
-                        const std::string zeroLabel = label + "_zero";
-                        const std::string doneLabel = label + "_done";
+                    const std::string normalLabel = label + "_normal";
+                    const std::string overflowLabel =
+                            label + "_overflow";
+                    const std::string zeroLabel = label + "_zero";
+                    const std::string doneLabel = label + "_done";
 
-                        out_ << "    testl %ecx, %ecx\n";
-                        out_ << "    je " << zeroLabel << "\n";
-                        out_ << "    cmpl $-1, %ecx\n";
-                        out_ << "    jne " << normalLabel << "\n";
-                        out_ << "    cmpl $-2147483648, %eax\n";
-                        out_ << "    je " << overflowLabel << "\n";
-                        out_ << normalLabel << ":\n";
-                        out_ << "    cltd\n";
-                        out_ << "    idivl %ecx\n";
-                        out_ << "    jmp " << doneLabel << "\n";
-                        out_ << overflowLabel << ":\n";
-                        out_ << "    movl $-2147483648, %eax\n";
-                        out_ << "    jmp " << doneLabel << "\n";
-                        out_ << zeroLabel << ":\n";
-                        out_ << "    ud2\n";
-                        out_ << doneLabel << ":\n";
-                        break;
-                    }
+                    out_ << "    testl %ecx, %ecx\n";
+                    out_ << "    je " << zeroLabel << "\n";
+                    out_ << "    cmpl $-1, %ecx\n";
+                    out_ << "    jne " << normalLabel << "\n";
+                    out_ << "    cmpl $-2147483648, %eax\n";
+                    out_ << "    je " << overflowLabel << "\n";
+                    out_ << normalLabel << ":\n";
+                    out_ << "    cltd\n";
+                    out_ << "    idivl %ecx\n";
+                    out_ << "    jmp " << doneLabel << "\n";
+                    out_ << overflowLabel << ":\n";
+                    out_ << "    movl $-2147483648, %eax\n";
+                    out_ << "    jmp " << doneLabel << "\n";
+                    out_ << zeroLabel << ":\n";
+                    out_ << "    ud2\n";
+                    out_ << doneLabel << ":\n";
+                } else {
+                    const std::string condition = [&]() -> std::string {
+                        if (expression.binaryOperator == "==") return "e";
+                        if (expression.binaryOperator == "!=") return "ne";
+                        if (expression.binaryOperator == "<") return "l";
+                        if (expression.binaryOperator == "<=") return "le";
+                        if (expression.binaryOperator == ">") return "g";
+                        if (expression.binaryOperator == ">=") return "ge";
+                        throw std::runtime_error("unknown IR binary operator");
+                    }();
 
-                    default:
-                        throw std::runtime_error(
-                            "unknown IR binary operator");
+                    out_ << "    cmpl %ecx, %eax\n";
+                    out_ << "    set" << condition << " %al\n";
+                    out_ << "    movzbl %al, %eax\n";
                 }
             }
 

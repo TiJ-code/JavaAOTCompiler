@@ -13,6 +13,7 @@ namespace JAOT::IR {
 
     enum class ExprKind {
         Integer,
+        Boolean,
         Local,
         Binary,
         Call,
@@ -24,8 +25,9 @@ namespace JAOT::IR {
         SourceLocation location {};
 
         std::int64_t integer = 0;
+        bool boolean = false;
         LocalId local = 0;
-        char binaryOperator = 0;
+        std::string binaryOperator;
         std::string callee;
         std::vector<std::unique_ptr<Expr>> arguments;
         std::unique_ptr<Expr> left;

@@ -1,0 +1,28 @@
+class Main {
+    static boolean isPositive(int value) {
+        return value > 0;
+    }
+
+    static void report(boolean enabled) {
+        if (enabled) {
+            printInt(420);
+        } else {
+            printInt(69);
+        }
+    }
+
+    static void main() {
+        boolean positive = isPositive(42);
+        if (positive) {
+            printInt(1);
+        } else {
+            printInt(0);
+        }
+
+        if (42 == 42) {
+            report(true);
+        } else {
+            report(false);
+        }
+    }
+}

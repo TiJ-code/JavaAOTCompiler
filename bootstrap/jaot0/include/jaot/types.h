@@ -5,6 +5,7 @@
 namespace JAOT {
     enum class Type {
         Int,
+        Boolean,
         Void,
     };
 

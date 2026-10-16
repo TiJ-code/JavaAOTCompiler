@@ -143,6 +143,20 @@ add_test(
 )
 
 add_test(
+        NAME jaot0_compile_if_else
+        COMMAND
+        ${CMAKE_COMMAND}
+        -DJAOT0=$<TARGET_FILE:jaot0>
+        -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/if_else.jaot
+        -DEXPECTED_OUTPUT_FILE=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/if_else.expected
+        -DOUTPUT_DIR=${JAOT0_TEST_OUTPUT_DIR}
+        -DCXX=${CMAKE_CXX_COMPILER}
+        -DRUNTIME=$<TARGET_FILE:jaot_runtime>
+        -DLAUNCHER=${CMAKE_CURRENT_SOURCE_DIR}/tests/runtime/launcher.cpp
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_test.cmake
+)
+
+add_test(
         NAME jaot0_compile_declaration_assignment
         COMMAND
         ${CMAKE_COMMAND}
@@ -304,6 +318,7 @@ set_tests_properties(
         jaot0_compile_hello
         jaot0_compile_functions
         jaot0_compile_assignment
+        jaot0_compile_if_else
         jaot0_compile_declaration_assignment
         jaot0_compile_division
         jaot0_compile_integer_bounds

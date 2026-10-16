@@ -4,41 +4,52 @@
 #include <string>
 
 namespace JAOT {
+    enum class TokenKind {
+        EndOfFile,
 
-enum class TokenKind {
-  EndOfFile,
+        Identifier,
+        Integer,
 
-  Identifier,
-  Integer,
+        KwClass,
+        KwStatic,
+        KwVoid,
+        KwInt,
+        KwBoolean,
+        KwTrue,
+        KwFalse,
+        KwReturn,
 
-  KwClass,
-  KwStatic,
-  KwVoid,
-  KwInt,
-  KwReturn,
+        KwIf,
+        KwElse,
 
-  LBrace,
-  RBrace,
-  LParen,
-  RParen,
-  Semicolon,
-  Comma,
+        LBrace,
+        RBrace,
+        LParen,
+        RParen,
+        Semicolon,
+        Comma,
 
-  Plus,
-  Minus,
-  Star,
-  Slash,
-  Equal,
-};
+        Plus,
+        Minus,
+        Star,
+        Slash,
+        Equal,
 
-struct Token {
-  TokenKind kind;
-  std::string text;
+        EqualEqual,
+        BangEqual,
+        Less,
+        LessEqual,
+        Greater,
+        GreaterEqual,
+    };
 
-  std::size_t line;
-  std::size_t column;
-};
+    struct Token {
+        TokenKind kind;
+        std::string text;
 
-const char *tokenKindName(TokenKind kind);
+        std::size_t line;
+        std::size_t column;
+    };
 
+    const char *tokenKindName(TokenKind kind);
 } // namespace JAOT

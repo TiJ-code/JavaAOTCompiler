@@ -2,14 +2,26 @@
 <project version="4">
   <component name="CidrCTestProjectState">
     <ctestState>
-      <lineNumber testId="path:null test:jaot0_compile_assignment" value="101" />
-      <lineNumber testId="path:null test:jaot0_compile_comments" value="176" />
-      <lineNumber testId="path:null test:jaot0_compile_division" value="115" />
-      <lineNumber testId="path:null test:jaot0_compile_functions" value="87" />
-      <lineNumber testId="path:null test:jaot0_compile_hello" value="73" />
-      <lineNumber testId="path:null test:jaot0_division_by_zero" value="129" />
-      <lineNumber testId="path:null test:jaot0_help" value="64" />
-      <lineNumber testId="path:null test:jaot0_semantic_missing_return" value="165" />
+      <lineNumber testId="path:null test:jaot0_compile_assignment" value="130" />
+      <lineNumber testId="path:null test:jaot0_compile_comments" value="244" />
+      <lineNumber testId="path:null test:jaot0_compile_declaration_assignment" value="158" />
+      <lineNumber testId="path:null test:jaot0_compile_division" value="183" />
+      <lineNumber testId="path:null test:jaot0_compile_functions" value="116" />
+      <lineNumber testId="path:null test:jaot0_compile_hello" value="102" />
+      <lineNumber testId="path:null test:jaot0_compile_if_else" value="144" />
+      <lineNumber testId="path:null test:jaot0_compile_integer_bounds" value="302" />
+      <lineNumber testId="path:null test:jaot0_division_by_zero" value="197" />
+      <lineNumber testId="path:null test:jaot0_help" value="93" />
+      <lineNumber testId="path:null test:jaot0_ir_header" value="90" />
+      <lineNumber testId="path:null test:jaot0_ir_lowering" value="91" />
+      <lineNumber testId="path:null test:jaot0_semantic_assignment_unknown_variable" value="222" />
+      <lineNumber testId="path:null test:jaot0_semantic_integer_below_bounds" value="291" />
+      <lineNumber testId="path:null test:jaot0_semantic_integer_bounds" value="280" />
+      <lineNumber testId="path:null test:jaot0_semantic_invalid_main_signature" value="269" />
+      <lineNumber testId="path:null test:jaot0_semantic_missing_main" value="258" />
+      <lineNumber testId="path:null test:jaot0_semantic_missing_return" value="233" />
+      <lineNumber testId="path:null test:jaot0_semantic_uninitialized_variable" value="172" />
+      <lineNumber testId="path:null test:jaot0_semantic_unknown_variable" value="211" />
     </ctestState>
   </component>
 </project>

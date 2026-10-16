@@ -65,6 +65,16 @@ namespace JAOT {
                                  ":" + std::to_string(token.column) + ": " + message);
     }
 
+    Type Parser::parseValueType() {
+        if (match(TokenKind::KwInt)) {
+            return Type::Int;
+        }
+        if (match(TokenKind::KwBoolean)) {
+            return Type::Boolean;
+        }
+        error("expected 'int' or 'boolean'");
+    }
+
     Program Parser::parse() {
         consume(TokenKind::KwClass, "expected 'class'");
 
@@ -96,6 +106,8 @@ namespace JAOT {
             returnType = Type::Void;
         } else if (match(TokenKind::KwInt)) {
             returnType = Type::Int;
+        } else if (match(TokenKind::KwBoolean)) {
+            returnType = Type::Boolean;
         } else {
             error("unexpected method return type");
         }
@@ -111,13 +123,12 @@ namespace JAOT {
 
         if (!check(TokenKind::RParen)) {
             while (true) {
-                consume(TokenKind::KwInt, "expected 'int' parameter");
-
+                const Type parameterType = parseValueType();
                 const auto &parameter =
                         consume(TokenKind::Identifier, "expected parameter name");
 
                 method.parameters.push_back({
-                    .type = Type::Int,
+                    .type = parameterType,
                     .name = parameter.text,
                     .location = {
                         .line = parameter.line,
@@ -144,13 +155,42 @@ namespace JAOT {
         return method;
     }
 
+    std::vector<Stmt> Parser::parseBlock() {
+        consume(TokenKind::LBrace, "expected '{' before block");
+
+        std::vector<Stmt> statements;
+
+        while (!check(TokenKind::RBrace) && !check(TokenKind::EndOfFile)) {
+            statements.push_back(parseStatement());
+        }
+
+        consume(TokenKind::RBrace, "expected '}' after block");
+        return statements;
+    }
+
     Stmt Parser::parseStatement() {
         if (match(TokenKind::KwInt)) {
-            return parseVariableDeclaration();
+            return parseVariableDeclaration(Type::Int);
+        }
+
+        if (match(TokenKind::KwBoolean)) {
+            return parseVariableDeclaration(Type::Boolean);
         }
 
         if (match(TokenKind::KwReturn)) {
             return parseReturn();
+        }
+
+        if (match(TokenKind::KwIf)) {
+            return parseIf();
+        }
+
+        if (check(TokenKind::LBrace)) {
+            Stmt statement;
+            statement.kind = StmtKind::Block;
+            statement.location = { current().line, current().column };
+            statement.body = parseBlock();
+            return statement;
         }
 
         if (check(TokenKind::Identifier) &&
@@ -169,11 +209,12 @@ namespace JAOT {
         return statement;
     }
 
-    Stmt Parser::parseVariableDeclaration() {
+    Stmt Parser::parseVariableDeclaration(Type type) {
         const auto &name = consume(TokenKind::Identifier, "expected variable name");
 
         Stmt statement;
         statement.kind = StmtKind::VarDecl;
+        statement.declaredType = type;
         statement.name = name.text;
         statement.location = { .line = name.line, .column =  name.column };
 
@@ -221,97 +262,104 @@ namespace JAOT {
         return statement;
     }
 
+    Stmt Parser::parseIf() {
+        const auto &ifToken = previous();
+
+        Stmt statement;
+        statement.kind = StmtKind::If;
+        statement.location = {ifToken.line, ifToken.column};
+
+        consume(TokenKind::LParen, "expected '(' after 'if'");
+        statement.condition = parseExpression();
+        consume(TokenKind::RParen, "expected ')' after condition");
+        statement.body = parseBlock();
+
+        if (match(TokenKind::KwElse)) {
+            statement.hasElse = true;
+            statement.elseBody = parseBlock();
+        }
+
+        return statement;
+    }
+
+    std::unique_ptr<Expr> Parser::makeBinary(
+        const Token &operatorToken,
+        std::unique_ptr<Expr> left,
+        std::unique_ptr<Expr> right) {
+        auto expression = std::make_unique<Expr>();
+        expression->kind = ExprKind::Binary;
+        expression->op = operatorToken.text;
+        expression->location = {operatorToken.line, operatorToken.column};
+        expression->left = std::move(left);
+        expression->right = std::move(right);
+        return expression;
+    }
+
     std::unique_ptr<Expr> Parser::parseExpression() {
-        auto left = parseTerm();
+        return parseEquality();
+    }
 
+    std::unique_ptr<Expr> Parser::parseEquality() {
+        auto left = parseComparison();
+        while (check(TokenKind::EqualEqual) || check(TokenKind::BangEqual)) {
+            const Token operatorToken = current();
+            ++index_;
+            left = makeBinary(operatorToken, std::move(left), parseComparison());
+        }
+        return left;
+    }
+
+    std::unique_ptr<Expr> Parser::parseComparison() {
+        auto left = parseAddition();
+        while (check(TokenKind::Less) ||
+                check(TokenKind::LessEqual) ||
+                check(TokenKind::Greater) ||
+                check(TokenKind::GreaterEqual)) {
+            const Token operatorToken = current();
+            ++index_;
+            left = makeBinary(operatorToken, std::move(left), parseAddition());
+        }
+        return left;
+    }
+
+    std::unique_ptr<Expr> Parser::parseAddition() {
+        auto left = parseMultiplication();
         while (check(TokenKind::Plus) || check(TokenKind::Minus)) {
-            const Token &operatorToken = current();
-            const char op = operatorToken.text[0];
+            const Token operatorToken = current();
             ++index_;
-
-            auto right = parseTerm();
-
-            auto expression = std::make_unique<Expr>();
-
-            expression->kind = ExprKind::Binary;
-            expression->op = op;
-            expression->location = {
-                .line = operatorToken.line,
-                .column = operatorToken.column
-            };
-            expression->left = std::move(left);
-            expression->right = std::move(right);
-
-            left = std::move(expression);
+            left = makeBinary(operatorToken, std::move(left), parseMultiplication());
         }
-
         return left;
     }
 
-    std::unique_ptr<Expr> Parser::parseTerm() {
-        auto left = parseFactor();
-
+    std::unique_ptr<Expr> Parser::parseMultiplication() {
+        auto left = parseUnary();
         while (check(TokenKind::Star) || check(TokenKind::Slash)) {
-            const Token &operatorToken = current();
-            const char op = operatorToken.text[0];
+            const Token operatorToken = current();
             ++index_;
-
-            auto right = parseFactor();
-
-            auto expression = std::make_unique<Expr>();
-
-            expression->kind = ExprKind::Binary;
-            expression->op = op;
-            expression->location = {
-                .line = operatorToken.line,
-                .column = operatorToken.column
-            };
-            expression->left = std::move(left);
-            expression->right = std::move(right);
-
-            left = std::move(expression);
+            left = makeBinary(operatorToken, std::move(left), parseUnary());
         }
-
         return left;
     }
 
-    std::unique_ptr<Expr> Parser::parseFactor() {
+    std::unique_ptr<Expr> Parser::parseUnary() {
         if (match(TokenKind::Minus)) {
-            const Token &minusToken = previous();
+            const Token minusToken = current();
 
             if (match(TokenKind::Integer)) {
-                const Token &integerToken = previous();
-
                 auto expression = std::make_unique<Expr>();
                 expression->kind = ExprKind::Integer;
-                expression->integer = parseIntegerLiteral(integerToken, true);
-                expression->location = {
-                    .line = minusToken.line,
-                    .column = minusToken.column
-                };
-
+                expression->integer = parseIntegerLiteral(previous(), true);
+                expression->location = {minusToken.line, minusToken.column};
                 return expression;
             }
 
-            auto expression = std::make_unique<Expr>();
-
-            expression->kind = ExprKind::Binary;
-            expression->op = '-';
-            expression->location = {
-                .line = minusToken.line,
-                .column = minusToken.column
-            };
-
             auto zero = std::make_unique<Expr>();
-
             zero->kind = ExprKind::Integer;
             zero->integer = 0;
-            zero->location = expression->location;
+            zero->location = {minusToken.line, minusToken.column};
 
-            expression->left = std::move(zero);
-            expression->right = parseFactor();
-
-            return expression;
+            return makeBinary(minusToken, std::move(zero), parseUnary());
         }
 
         return parsePrimary();
@@ -319,50 +367,41 @@ namespace JAOT {
 
     std::unique_ptr<Expr> Parser::parsePrimary() {
         if (match(TokenKind::Integer)) {
-            const auto &integerToken = previous();
-
+            const auto &token = previous();
             auto expression = std::make_unique<Expr>();
-
             expression->kind = ExprKind::Integer;
-            expression->integer = parseIntegerLiteral(integerToken);
-            expression->location = {
-                .line = integerToken.line,
-                .column = integerToken.column
-            };
+            expression->integer = parseIntegerLiteral(token);
+            expression->location = {token.line, token.column};
+            return expression;
+        }
 
+        if (match(TokenKind::KwTrue) || match(TokenKind::KwFalse)) {
+            const auto &token = previous();
+            auto expression = std::make_unique<Expr>();
+            expression->kind = ExprKind::Boolean;
+            expression->boolean = token.kind == TokenKind::KwTrue;
+            expression->location = {token.line, token.column};
             return expression;
         }
 
         if (match(TokenKind::Identifier)) {
-            const Token &identifier = previous();
-            const std::string name = identifier.text;
-
+            const Token identifier = previous();
             if (!match(TokenKind::LParen)) {
                 auto expression = std::make_unique<Expr>();
-
                 expression->kind = ExprKind::Variable;
-                expression->name = name;
-                expression->location = {
-                    .line = identifier.line,
-                    .column = identifier.column
-                };
-
+                expression->name = identifier.text;
+                expression->location = {identifier.line, identifier.column};
                 return expression;
             }
 
             auto expression = std::make_unique<Expr>();
-
             expression->kind = ExprKind::Call;
-            expression->callee = name;
-            expression->location = {
-                .line = identifier.line,
-                .column = identifier.column
-            };
+            expression->callee = identifier.text;
+            expression->location = {identifier.line, identifier.column};
 
             if (!check(TokenKind::RParen)) {
                 while (true) {
                     expression->arguments.push_back(parseExpression());
-
                     if (!match(TokenKind::Comma)) {
                         break;
                     }
@@ -370,15 +409,12 @@ namespace JAOT {
             }
 
             consume(TokenKind::RParen, "expected ')' after arguments");
-
             return expression;
         }
 
         if (match(TokenKind::LParen)) {
             auto expression = parseExpression();
-
             consume(TokenKind::RParen, "expected ')' after expression");
-
             return expression;
         }
 

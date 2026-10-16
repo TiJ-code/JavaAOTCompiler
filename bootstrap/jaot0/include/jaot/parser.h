@@ -11,6 +11,7 @@
 namespace JAOT {
     enum class ExprKind {
         Integer,
+        Boolean,
         Variable,
         Binary,
         Call,
@@ -21,10 +22,11 @@ namespace JAOT {
         SourceLocation location {};
 
         int64_t integer = 0;
+        bool boolean = false;
 
         std::string name;
 
-        char op = 0;
+        std::string op;
 
         std::string callee;
 
@@ -39,14 +41,22 @@ namespace JAOT {
         Assignment,
         Expression,
         Return,
+        Block,
+        If,
     };
 
     struct Stmt {
         StmtKind kind;
         SourceLocation location {};
+        Type declaredType = Type::Int;
 
         std::string name;
         std::unique_ptr<Expr> expression;
+        std::unique_ptr<Expr> condition;
+
+        std::vector<Stmt> body;
+        std::vector<Stmt> elseBody;
+        bool hasElse = false;
     };
 
     struct Parameter {
@@ -86,23 +96,37 @@ namespace JAOT {
 
         const Token &consume(TokenKind kind, const char *message);
 
+        Type parseValueType();
+
         Method parseMethod();
+
+        std::vector<Stmt> parseBlock();
 
         Stmt parseStatement();
 
-        Stmt parseVariableDeclaration();
+        Stmt parseVariableDeclaration(Type type);
 
         Stmt parseAssignment();
 
         Stmt parseReturn();
 
+        Stmt parseIf();
+
         std::unique_ptr<Expr> parseExpression();
 
-        std::unique_ptr<Expr> parseTerm();
+        std::unique_ptr<Expr> parseEquality();
 
-        std::unique_ptr<Expr> parseFactor();
+        std::unique_ptr<Expr> parseComparison();
+
+        std::unique_ptr<Expr> parseAddition();
+
+        std::unique_ptr<Expr> parseMultiplication();
+
+        std::unique_ptr<Expr> parseUnary();
 
         std::unique_ptr<Expr> parsePrimary();
+
+        std::unique_ptr<Expr> makeBinary(const Token &operatorToken, std::unique_ptr<Expr> left, std::unique_ptr<Expr> right);
 
         void error(const std::string &message) const;
 

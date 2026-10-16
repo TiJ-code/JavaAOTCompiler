@@ -72,7 +72,7 @@ int main() {
         const JAOT::IR::Expr &sum = *addEntry.terminator.expression;
         require(sum.kind == JAOT::IR::ExprKind::Binary,
             "'add' return statement should be a binary expression");
-        require(sum.binaryOperator == '+',
+        require(sum.binaryOperator == "+",
             "'add' should use +");
         require(sum.left &&
             sum.left->kind == JAOT::IR::ExprKind::Local &&

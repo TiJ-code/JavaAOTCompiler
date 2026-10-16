@@ -2,11 +2,14 @@
 
 #include "jaot/parser.h"
 
+#include <limits>
+#include <optional>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 namespace JAOT {
     namespace {
-        using LocalIds = std::unordered_map<std::string, IR::LocalId>;
         using MethodReturnTypes = std::unordered_map<std::string, Type>;
 
         [[noreturn]] void loweringError(const std::string &message) {
@@ -15,183 +18,296 @@ namespace JAOT {
 
         class MethodLowerer {
         public:
-            explicit MethodLowerer(const MethodReturnTypes &methodReturnTypes) : methodReturnTypes_(methodReturnTypes) {}
+            explicit MethodLowerer(const MethodReturnTypes &returnTypes)
+                : returnTypes_(returnTypes) {}
 
             IR::Method lower(const Method &method) {
-                IR::Method result;
-                result.name = method.name;
-                result.returnType = method.returnType;
+                result_.name = method.name;
+                result_.returnType = method.returnType;
+                scopes_.emplace_back();
 
                 for (const Parameter &parameter : method.parameters) {
-                    const IR::LocalId id = addLocal(result, parameter.name, parameter.type, true);
-                    result.parameters.push_back(id);
-                }
-
-                for (const Stmt &statement : method.body) {
-                    if (statement.kind == StmtKind::VarDecl) {
-                        addLocal(result, statement.name, Type::Int, false);
-                    }
+                    const IR::LocalId id =
+                        addLocal(parameter.name, parameter.type, true);
+                    result_.parameters.push_back(id);
                 }
 
                 IR::BasicBlock entry;
                 entry.id = 0;
+                result_.blocks.push_back(std::move(entry));
+                currentBlock_ = 0;
 
-                bool hasReturn = false;
+                lowerStatements(method.body);
 
-                for (const Stmt &statement : method.body) {
-                    if (statement.kind == StmtKind::VarDecl && !statement.expression) {
-                        continue;
-                    }
-
-                    if (statement.kind == StmtKind::Return) {
-                        entry.terminator.kind = IR::TerminatorKind::Return;
-                        entry.terminator.location = statement.location;
-
-                        if (statement.expression) {
-                            entry.terminator.expression = lowerExpression(*statement.expression);
-                        }
-
-                        hasReturn = true;
-                        break;
-                    }
-
-                    entry.statements.push_back(lowerStatement(statement));
-                }
-
-                if (!hasReturn) {
+                if (currentBlock_) {
+                    IR::Terminator &terminator = block(*currentBlock_).terminator;
                     if (method.returnType != Type::Void) {
-                        loweringError("int method is missing return: " + method.name);
+                        loweringError(
+                            "non-void method is missing return: " + method.name);
                     }
-
-                    entry.terminator.kind = IR::TerminatorKind::Return;
+                    terminator.kind = IR::TerminatorKind::Return;
+                    currentBlock_.reset();
                 }
 
-                result.blocks.push_back(std::move(entry));
-                return result;
+                return std::move(result_);
             }
 
         private:
-            IR::LocalId addLocal(IR::Method &method, const std::string &name, Type type, bool isParameter) {
-                if (localIds_.contains(name)) {
+            IR::BlockId newBlock() {
+                if (result_.blocks.size() >
+                    std::numeric_limits<IR::BlockId>::max()) {
+                    loweringError("too many basic blocks in method " + result_.name);
+                }
+                const auto id =
+                    static_cast<IR::BlockId>(result_.blocks.size());
+                IR::BasicBlock basicBlock;
+                basicBlock.id = id;
+                result_.blocks.push_back(std::move(basicBlock));
+                return id;
+            }
+
+            IR::BasicBlock &block(IR::BlockId id) {
+                if (id >= result_.blocks.size() || result_.blocks[id].id != id) {
+                    loweringError("invalid basic block id");
+                }
+                return result_.blocks[id];
+            }
+
+            IR::LocalId addLocal(
+                const std::string &name,
+                Type type,
+                bool isParameter) {
+                if (scopes_.back().contains(name)) {
                     loweringError("duplicate local: " + name);
                 }
-
-                if (nextLocalId_ > std::numeric_limits<IR::LocalId>::max()) {
-                    loweringError("too many locals in method " + method.name);
+                if (result_.locals.size() >
+                    std::numeric_limits<IR::LocalId>::max()) {
+                    loweringError("too many locals in method " + result_.name);
                 }
 
-                const auto id = static_cast<IR::LocalId>(nextLocalId_++);
-                localIds_.emplace(name, id);
-                method.locals.push_back({id, name, type, isParameter});
+                const auto id =
+                    static_cast<IR::LocalId>(result_.locals.size());
+                scopes_.back().emplace(name, id);
+                result_.locals.push_back({id, name, type, isParameter});
                 return id;
             }
 
             IR::LocalId findLocal(const std::string &name) const {
-                const auto found = localIds_.find(name);
-                if (found == localIds_.end()) {
-                    loweringError("unresolved local: " + name);
+                for (auto scope = scopes_.rbegin(); scope != scopes_.rend(); ++scope) {
+                    const auto found = scope->find(name);
+                    if (found != scope->end()) {
+                        return found->second;
+                    }
                 }
-
-                return found->second;
+                loweringError("unresolved local: " + name);
             }
 
-            std::unique_ptr<IR::Expr> lowerExpression(const Expr &expression) const {
-                auto result = std::make_unique<IR::Expr>();
-                result->type = Type::Int;
-                result->location = expression.location;
+            Type localType(IR::LocalId id) const {
+                if (id >= result_.locals.size()) {
+                    loweringError("invalid local id");
+                }
+                return result_.locals[id].type;
+            }
+
+            std::unique_ptr<IR::Expr> lowerExpression(const Expr &expression) {
+                auto lowered = std::make_unique<IR::Expr>();
+                lowered->location = expression.location;
 
                 switch (expression.kind) {
                     case ExprKind::Integer:
-                        result->kind = IR::ExprKind::Integer;
-                        result->integer = expression.integer;
-                        return result;
+                        lowered->kind = IR::ExprKind::Integer;
+                        lowered->type = Type::Int;
+                        lowered->integer = expression.integer;
+                        return lowered;
+
+                    case ExprKind::Boolean:
+                        lowered->kind = IR::ExprKind::Boolean;
+                        lowered->type = Type::Boolean;
+                        lowered->boolean = expression.boolean;
+                        return lowered;
 
                     case ExprKind::Variable:
-                        result->kind = IR::ExprKind::Local;
-                        result->local = findLocal(expression.name);
-                        return result;
+                        lowered->kind = IR::ExprKind::Local;
+                        lowered->local = findLocal(expression.name);
+                        lowered->type = localType(lowered->local);
+                        return lowered;
 
                     case ExprKind::Binary:
-                        result->kind = IR::ExprKind::Binary;
-                        result->binaryOperator = expression.op;
-                        result->left = lowerExpression(*expression.left);
-                        result->right = lowerExpression(*expression.right);
-                        return result;
+                        lowered->kind = IR::ExprKind::Binary;
+                        lowered->binaryOperator = expression.op;
+                        lowered->left = lowerExpression(*expression.left);
+                        lowered->right = lowerExpression(*expression.right);
+                        lowered->type =
+                            expression.op == "+" || expression.op == "-" ||
+                            expression.op == "*" || expression.op == "/"
+                                ? Type::Int : Type::Boolean;
+                        return lowered;
 
                     case ExprKind::Call: {
-                        result->kind = IR::ExprKind::Call;
-                        result->callee = expression.callee;
-
+                        lowered->kind = IR::ExprKind::Call;
+                        lowered->callee = expression.callee;
                         if (expression.callee == "printInt") {
-                            result->type = Type::Void;
+                            lowered->type = Type::Void;
                         } else {
-                            const auto method =
-                                    methodReturnTypes_.find(expression.callee);
-                            if (method == methodReturnTypes_.end()) {
+                            const auto found = returnTypes_.find(expression.callee);
+                            if (found == returnTypes_.end()) {
                                 loweringError(
                                     "unresolved function: " + expression.callee);
                             }
-                            result->type = method->second;
+                            lowered->type = found->second;
                         }
-
                         for (const auto &argument : expression.arguments) {
-                            result->arguments.push_back(
+                            lowered->arguments.push_back(
                                 lowerExpression(*argument));
                         }
-
-                        return result;
+                        return lowered;
                     }
                 }
 
                 loweringError("unknown expression kind");
             }
 
+            void appendStatement(IR::Statement statement) {
+                if (!currentBlock_) {
+                    loweringError("statement lowered after terminated block");
+                }
+                block(*currentBlock_).statements.push_back(std::move(statement));
+            }
 
-            IR::Statement lowerStatement(const Stmt &statement) const {
-                IR::Statement result;
-                result.location = statement.location;
+            void lowerStatements(const std::vector<Stmt> &statements) {
+                for (const Stmt &statement : statements) {
+                    if (!currentBlock_) {
+                        return;
+                    }
+                    lowerStatement(statement);
+                }
+            }
 
+            void lowerScopedStatements(const std::vector<Stmt> &statements) {
+                scopes_.emplace_back();
+                lowerStatements(statements);
+                scopes_.pop_back();
+            }
+
+            void lowerStatement(const Stmt &statement) {
                 switch (statement.kind) {
                     case StmtKind::VarDecl: {
-                        result.kind = IR::StatementKind::AssignLocal;
-                        result.target = findLocal(statement.name);
-                        result.expression = lowerExpression(*statement.expression);
+                        std::unique_ptr<IR::Expr> initializer;
+                        if (statement.expression) {
+                            initializer = lowerExpression(*statement.expression);
+                        }
 
-                        return result;
+                        const IR::LocalId id = addLocal(
+                            statement.name, statement.declaredType, false);
+                        if (initializer) {
+                            IR::Statement assignment;
+                            assignment.kind = IR::StatementKind::AssignLocal;
+                            assignment.location = statement.location;
+                            assignment.target = id;
+                            assignment.expression = std::move(initializer);
+                            appendStatement(std::move(assignment));
+                        }
+                        return;
                     }
 
-                    case StmtKind::Assignment:
-                        result.kind = IR::StatementKind::AssignLocal;
-                        result.target = findLocal(statement.name);
-                        result.expression =
-                                lowerExpression(*statement.expression);
-                        return result;
+                    case StmtKind::Assignment: {
+                        IR::Statement assignment;
+                        assignment.kind = IR::StatementKind::AssignLocal;
+                        assignment.location = statement.location;
+                        assignment.target = findLocal(statement.name);
+                        assignment.expression = lowerExpression(*statement.expression);
+                        appendStatement(std::move(assignment));
+                        return;
+                    }
 
-                    case StmtKind::Expression:
-                        result.kind = IR::StatementKind::Evaluate;
-                        result.expression =
-                                lowerExpression(*statement.expression);
-                        return result;
+                    case StmtKind::Expression: {
+                        IR::Statement evaluate;
+                        evaluate.kind = IR::StatementKind::Evaluate;
+                        evaluate.location = statement.location;
+                        evaluate.expression = lowerExpression(*statement.expression);
+                        appendStatement(std::move(evaluate));
+                        return;
+                    }
 
-                    case StmtKind::Return:
-                        loweringError(
-                            "return must be lowered as a block terminator"
-                        );
+                    case StmtKind::Return: {
+                        IR::Terminator &terminator =
+                            block(*currentBlock_).terminator;
+                        terminator.kind = IR::TerminatorKind::Return;
+                        terminator.location = statement.location;
+                        if (statement.expression) {
+                            terminator.expression =
+                                lowerExpression(*statement.expression);
+                        }
+                        currentBlock_.reset();
+                        return;
+                    }
+
+                    case StmtKind::Block:
+                        lowerScopedStatements(statement.body);
+                        return;
+
+                    case StmtKind::If: {
+                        const IR::BlockId thenId = newBlock();
+                        const IR::BlockId elseId =
+                            statement.hasElse ? newBlock() : 0;
+                        const IR::BlockId mergeId = newBlock();
+                        const IR::BlockId falseId =
+                            statement.hasElse ? elseId : mergeId;
+
+                        IR::Terminator &branch =
+                            block(*currentBlock_).terminator;
+                        branch.kind = IR::TerminatorKind::Branch;
+                        branch.location = statement.location;
+                        branch.condition = lowerExpression(*statement.condition);
+                        branch.trueTarget = thenId;
+                        branch.falseTarget = falseId;
+
+                        currentBlock_ = thenId;
+                        lowerScopedStatements(statement.body);
+                        const bool thenFallsThrough = currentBlock_.has_value();
+                        if (thenFallsThrough) {
+                            IR::Terminator &jump =
+                                block(*currentBlock_).terminator;
+                            jump.kind = IR::TerminatorKind::Jump;
+                            jump.target = mergeId;
+                        }
+
+                        bool elseFallsThrough = true;
+                        if (statement.hasElse) {
+                            currentBlock_ = elseId;
+                            lowerScopedStatements(statement.elseBody);
+                            elseFallsThrough = currentBlock_.has_value();
+                            if (elseFallsThrough) {
+                                IR::Terminator &jump =
+                                    block(*currentBlock_).terminator;
+                                jump.kind = IR::TerminatorKind::Jump;
+                                jump.target = mergeId;
+                            }
+                        }
+
+                        if (thenFallsThrough || elseFallsThrough) {
+                            currentBlock_ = mergeId;
+                        } else {
+                            currentBlock_.reset();
+                        }
+                        return;
+                    }
                 }
 
                 loweringError("unknown statement kind");
             }
 
-            const MethodReturnTypes &methodReturnTypes_;
-            LocalIds localIds_;
-            std::size_t nextLocalId_ = 0;
+            const MethodReturnTypes &returnTypes_;
+            IR::Method result_;
+            std::vector<std::unordered_map<std::string, IR::LocalId>> scopes_;
+            std::optional<IR::BlockId> currentBlock_;
         };
     }
 
     IR::Program IrLowerer::lower(const Program &program) const {
-        MethodReturnTypes methodReturnTypes;
+        MethodReturnTypes returnTypes;
         for (const Method &method : program.methods) {
-            if (!methodReturnTypes.emplace(method.name, method.returnType).second) {
+            if (!returnTypes.emplace(method.name, method.returnType).second) {
                 loweringError("duplicate method: " + method.name);
             }
         }
@@ -199,10 +315,9 @@ namespace JAOT {
         IR::Program result;
         result.methods.reserve(program.methods.size());
         for (const Method &method : program.methods) {
-            MethodLowerer lowerer(methodReturnTypes);
+            MethodLowerer lowerer(returnTypes);
             result.methods.push_back(lowerer.lower(method));
         }
-
         return result;
     }
 }
