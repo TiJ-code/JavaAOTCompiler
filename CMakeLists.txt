@@ -18,7 +18,8 @@ add_executable(jaot0
         bootstrap/jaot0/include/jaot/ir.h
         bootstrap/jaot0/include/jaot/ir_lowering.h
         bootstrap/jaot0/src/ir_lowering.cpp
-        bootstrap/jaot0/include/jaot/types.h)
+        bootstrap/jaot0/include/jaot/types.h
+)
 
 target_sources(jaot0
         PRIVATE
@@ -30,6 +31,27 @@ target_sources(jaot0
 )
 
 target_include_directories(jaot0
+        PRIVATE
+        bootstrap/jaot0/include
+)
+
+add_executable(jaot0_ir_header_test
+        tests/ir_header_test.cpp
+)
+
+target_include_directories(jaot0_ir_header_test
+        PRIVATE
+        bootstrap/jaot0/include
+)
+
+add_executable(jaot0_ir_lowering_test
+        tests/ir_lowering_test.cpp
+        bootstrap/jaot0/src/lexer.cpp
+        bootstrap/jaot0/src/parser.cpp
+        bootstrap/jaot0/src/ir_lowering.cpp
+)
+
+target_include_directories(jaot0_ir_lowering_test
         PRIVATE
         bootstrap/jaot0/include
 )
@@ -65,6 +87,9 @@ target_include_directories(jaot_runtime
 )
 
 enable_testing()
+
+add_test(NAME jaot0_ir_header COMMAND jaot0_ir_header_test)
+add_test(NAME jaot0_ir_lowering COMMAND jaot0_ir_lowering_test)
 
 add_test(
         NAME jaot0_help
