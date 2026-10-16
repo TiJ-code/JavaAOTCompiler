@@ -147,13 +147,28 @@ static void hello() {
 
 A `void` method cannot be used as an expression.
 
-## 7.3 Future types
+## 7.3 `boolean`
+
+`boolean` is a value type whose only values are `true` and `false`. It can be
+used as a method parameter or return type, and as a local variable type:
+
+```java
+boolean enabled = true;
+
+static boolean isPositive(int value) {
+    return value > 0;
+}
+```
+
+Boolean and integer values are distinct types. JAOT0 does not implicitly
+convert between them. `true` and `false` are boolean literals.
+
+## 7.4 Future types
 
 The following are intentionally reserved for later stages:
 
 ```text
 long
-boolean
 char
 reference types
 arrays
@@ -162,23 +177,27 @@ String
 
 ## 8. Variables
 
-Local variables can be declared inside methods. They may be declared with or
-without an initializer:
+Local variables of type `int` or `boolean` can be declared inside methods.
+They may be declared with or without an initializer:
 
 ```java
 int answer;
 int initialized = 42;
+boolean enabled = true;
 ```
 
 A variable declared without an initializer must be assigned before it is
 read. Reading it earlier is a semantic error. Method parameters are initialized
-when the method is called.
+when the method is called. Each block introduces a scope. A local variable is
+visible from its declaration to the end of its containing block, including
+nested blocks; a nested block may declare a variable with the same name as one
+in an enclosing block.
 
 ## 9. Assignment
 
 Local variables and method parameters are mutable. An assignment updates a
-previously declared variable; it does not declare a new one. Assignment is a
-statement, not an expression:
+previously declared variable with a value of the same type; it does not declare
+a new one. Assignment is a statement, not an expression:
 
 ```java
 int count = 0;
@@ -192,7 +211,7 @@ are not supported.
 
 ```text
 variable-declaration:
-    int Identifier = expression ;
+    value-type Identifier ("=" expression)? ;
 
 assignment-statement:
     Identifier = expression ;
@@ -200,24 +219,27 @@ assignment-statement:
 
 ## 10. Expressions
 
-JAOT0 supports integer expressions.
+JAOT0 supports integer and boolean expressions.
 
 ```java
 1 + 2
 20 + 22
 10 * 5
 100 - 25
+value >= 0
+enabled == false
 ```
 
 Expressions can contain:
 
 - integer literals
+- boolean literals
 - variables
 - function calls
-- arithmetic operators
+- arithmetic and comparison operators
 - parentheses
 
-## 11. Arithmetic Operators
+## 11. Operators
 
 The initial operators are:
 
@@ -244,7 +266,19 @@ Operator precedence:
 ```text
 * /
 + -
+< <= > >=
+== !=
 ```
+
+Operators at the same precedence level associate from left to right. Arithmetic
+operators require `int` operands and produce an `int`. Relational operators
+require `int` operands and produce a `boolean`. Equality operators require two
+operands of the same type (`int` or `boolean`) and produce a `boolean`.
+Relational comparisons use signed integer values. Logical operators such as
+`&&`, `||`, and `!` are not part of this stage.
+
+An expression's operands are evaluated from left to right. In particular,
+comparisons do not short-circuit.
 
 ## 12. Function Calls
 
@@ -275,8 +309,9 @@ int x = add(10 * 2, 20 + 2);
 ## 13. Stack Frames and Calling Convention
 
 The initial native backend targets x86-64 System V and uses a frame pointer for
-each method. Each parameter and local variable gets a four-byte stack slot,
-matching the 32-bit `int` type. Parameters occupy slots just like locals; the
+each method. Each parameter and local variable gets a four-byte stack slot.
+`int` values use signed 32-bit representation; `boolean` values use `0` for
+`false` and `1` for `true`. Parameters occupy slots just like locals; the
 method prologue copies incoming arguments into those slots so that all variable
 references use the same frame-relative addressing.
 
@@ -287,14 +322,15 @@ allocation is rounded up to a multiple of 16 bytes to preserve the required
 stack alignment for calls.
 
 The prologue saves the caller's frame pointer, establishes the new `%rbp`, and
-reserves the aligned frame allocation. Methods return their integer result in
-`%eax`; the epilogue uses `leave` and `ret` to restore the caller's frame and
-return address.
+reserves the aligned frame allocation. Methods return `int` and `boolean`
+results in `%eax`; boolean results use the same `0`/`1` representation. The
+epilogue uses `leave` and `ret` to restore the caller's frame and return address.
 
-Integer arguments use the x86-64 System V registers in order: `%rdi`, `%rsi`,
-`%rdx`, `%rcx`, `%r8`, and `%r9`. The callee copies the corresponding 32-bit
-register values into its parameter slots. JAOT0 currently supports at most six
-parameters per method; stack-passed arguments are not implemented.
+`int` and `boolean` arguments use the x86-64 System V integer argument
+registers in order: `%rdi`, `%rsi`, `%rdx`, `%rcx`, `%r8`, and `%r9`. The callee
+copies the corresponding 32-bit register values into its parameter slots.
+JAOT0 currently supports at most six parameters per method; stack-passed
+arguments are not implemented.
 
 Call arguments are evaluated from left to right and temporarily pushed so
 evaluating a later argument cannot overwrite an earlier result. The values are
@@ -330,7 +366,7 @@ outputs
 
 ## 15. Return Statements
 
-A method returning a value uses:
+A non-`void` method returns a value of its declared type:
 
 ```java
 return expression;
@@ -342,27 +378,47 @@ A `void` method may use:
 return;
 ```
 
-Every `int` method must return an `int` value on every reachable path. The
-current JAOT0 version has no conditional or loop statements, so an `int` method
-must contain a return statement; otherwise, execution could reach the end
-without producing a value. A `void` method may either return with `return;` or
-reach the end of its body.
+Every `int` and `boolean` method must return a value of its declared type on
+every reachable path. A `void` method may either return with `return;` or reach
+the end of its body. A return expression must have exactly the declared return
+type; `void` methods cannot return a value.
 
 ## 16. Statements
 
-The initial statement set is intentionally tiny:
+JAOT0 statements include:
 
 ```text
 variable declaration
+assignment
 expression statement
+if statement
 return statement
 ```
 
 ```java
 int x = 42;
 printInt(x);
-return x;
+if (x > 0) {
+    printInt(x);
+} else {
+    printInt(0);
+}
 ```
+
+An `if` statement evaluates its parenthesized condition once. The condition
+must have type `boolean`; the `then` block executes when it is `true`, and the
+optional `else` block executes when it is `false`. If there is no `else` and
+the condition is false, execution continues after the `if`. Blocks may contain
+nested `if` statements.
+
+Every variable read must be definitely initialized on every path reaching the
+read. After an `if`/`else`, a variable is definitely initialized only if it is
+initialized at the end of every branch that can continue. For an `if` without
+an `else`, assignments made only in the `then` block do not make a variable
+definitely initialized after the statement. Return analysis likewise accounts
+for both branches; both branches of an `if`/`else` must return for that
+statement to guarantee a return. Flow analysis treats both branches as possible,
+even when the condition is a literal.
 
 ## 17. Comments
 
@@ -438,7 +494,12 @@ class
 static 
 void
 int
+boolean
+true
+false
 return
+if
+else
 ```
 
 They cannot be used as identifiers.
@@ -452,6 +513,9 @@ JAOT0 uses:
 ( )
 ;
 ,
+=
++ - * /
+== != < <= > >=
 ```
 
 ```java
@@ -464,7 +528,7 @@ class Main {
 
 ## 22. Complete Minimal Grammar
 
-The initial JAOT0 grammar can be described as:
+The JAOT0 grammar can be described as:
 
 ```text
 program
@@ -487,52 +551,73 @@ parameter-list
     ::= parameter ("," parameter)* ;
     
 parameter
-    ::= "int" identifier ;
-    
+    ::= value-type identifier ;
+
 type
     ::= "int"
+      | "boolean"
       | "void";
-      
+
+value-type
+    ::= "int"
+      | "boolean";
+
 block
     ::= "{"
         statement*
         "}";
-        
+
 statement
-    ::= variable-declaration
+    ::= block
+      | variable-declaration
       | assignment-statement
       | expression-statement
+      | if-statement
       | return-statement;
-      
+
 variable-declaration
-    ::= "int" identifier ("=" expression)? ";" ;
+    ::= value-type identifier ("=" expression)? ";" ;
 
 assignment-statement
     ::= identifier "=" expression ";" ;
-    
+
+if-statement
+    ::= "if" "(" expression ")" block
+        ("else" block)? ;
+
 expression-statement
     ::= expression ";" ;
-    
+
 return-statement
     ::= "return" expression? ";" ;
-    
+
 expression
-    ::= addition ;
-    
+    ::= equality ;
+
+equality
+    ::= comparison
+        (("==" | "!=") comparison)* ;
+
+comparison
+    ::= addition
+        (("<" | "<=" | ">" | ">=") addition)* ;
+
 addition
     ::= multiplication
         (("+" | "-") multiplication)* ;
-        
+
 multiplication
     ::= unary
         (("*" | "/") unary)* ;
-        
+
 unary
     ::= "-" unary
       | primary ;
-      
+
 primary
     ::= integer
+      | "true"
+      | "false"
       | identifier
       | call
       | "(" expression ")" ;
@@ -541,14 +626,16 @@ call
     ::= identifier
         "(" argument-list? ")" ;
         
-argument-list:
+argument-list
     ::= expression ("," expression)* ;
     
 integer
     ::= digit+ ;
     
-identifier:
-    ::= letter (letter | digit)* ;
+identifier
+    ::= (letter | "_") (letter | digit | "_")* ;
 ```
 
-This grammar is intentionally small.
+This grammar is intentionally small. The grammar describes syntax; semantic
+analysis enforces the operand, condition, argument, assignment, and return
+types described above. `void` is valid only as a method return type.
