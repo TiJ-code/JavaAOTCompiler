@@ -50,13 +50,15 @@ namespace JAOT {
                          << localOffset(method.parameters[i]) << "(%rbp)\n";
                 }
 
-                for (const IR::Statement &statement : method.statements) {
-                    generateStatement(statement);
-                }
+                for (const IR::BasicBlock &block : method.blocks) {
+                    out_ << ".Ljaot_" << method.name << "_block_" << block.id << ":\n";
 
-                out_ << "    movl $0, %eax\n";
-                out_ << "    leave\n";
-                out_ << "    ret\n";
+                    for (const IR::Statement &statement : block.statements) {
+                        generateStatement(statement);
+                    }
+
+                    generateTerminator(method, block.terminator);
+                }
             }
 
         private:
@@ -99,19 +101,43 @@ namespace JAOT {
                         }
                         generateExpression(*statement.expression);
                         return;
+                }
 
-                    case IR::StatementKind::Return:
-                        if (statement.expression) {
-                            generateExpression(*statement.expression);
+                throw std::runtime_error("unknown IR statement kind");
+            }
+
+            void generateTerminator(
+                const IR::Method &method,
+                const IR::Terminator &terminator
+            ) {
+                switch (terminator.kind) {
+                    case IR::TerminatorKind::Jump:
+                        out_ << "    jmp .Ljaot_" << method.name << "_block_" << terminator.target << "\n";
+                        return;
+
+                    case IR::TerminatorKind::Branch:
+                        if (!terminator.condition) {
+                            throw std::runtime_error("IR branch without condition");
+                        }
+
+                        generateExpression(*terminator.condition);
+                        out_ << "    testl %eax, %eax\n";
+                        out_ << "    jne .Ljaot_" << method.name << "_block_" << terminator.trueTarget << "\n";
+                        out_ << "    jmp .Ljaot_" << method.name << "_block_" << terminator.falseTarget << "\n";
+                        return;
+
+                    case IR::TerminatorKind::Return:
+                        if (terminator.expression) {
+                            generateExpression(*terminator.expression);
                         } else {
                             out_ << "    movl $0, %eax\n";
                         }
+
                         out_ << "    leave\n";
                         out_ << "    ret\n";
                         return;
                 }
-
-                throw std::runtime_error("unknown IR statement kind");
+                throw std::runtime_error("unknown IR terminator kind");
             }
 
             void generateExpression(const IR::Expr &expression) {

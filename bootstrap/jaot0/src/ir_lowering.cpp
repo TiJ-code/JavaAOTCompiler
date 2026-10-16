@@ -33,14 +33,40 @@ namespace JAOT {
                     }
                 }
 
+                IR::BasicBlock entry;
+                entry.id = 0;
+
+                bool hasReturn = false;
+
                 for (const Stmt &statement : method.body) {
-                    if (statement.kind == StmtKind::VarDecl &&
-                        !statement.expression) {
+                    if (statement.kind == StmtKind::VarDecl && !statement.expression) {
                         continue;
                     }
-                    result.statements.push_back(lowerStatement(statement));
+
+                    if (statement.kind == StmtKind::Return) {
+                        entry.terminator.kind = IR::TerminatorKind::Return;
+                        entry.terminator.location = statement.location;
+
+                        if (statement.expression) {
+                            entry.terminator.expression = lowerExpression(*statement.expression);
+                        }
+
+                        hasReturn = true;
+                        break;
+                    }
+
+                    entry.statements.push_back(lowerStatement(statement));
                 }
 
+                if (!hasReturn) {
+                    if (method.returnType != Type::Void) {
+                        loweringError("int method is missing return: " + method.name);
+                    }
+
+                    entry.terminator.kind = IR::TerminatorKind::Return;
+                }
+
+                result.blocks.push_back(std::move(entry));
                 return result;
             }
 
@@ -148,12 +174,9 @@ namespace JAOT {
                         return result;
 
                     case StmtKind::Return:
-                        result.kind = IR::StatementKind::Return;
-                        if (statement.expression) {
-                            result.expression =
-                                    lowerExpression(*statement.expression);
-                        }
-                        return result;
+                        loweringError(
+                            "return must be lowered as a block terminator"
+                        );
                 }
 
                 loweringError("unknown statement kind");

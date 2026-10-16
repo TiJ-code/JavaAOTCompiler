@@ -9,6 +9,7 @@
 
 namespace JAOT::IR {
     using LocalId = std::uint32_t;
+    using BlockId = std::uint32_t;
 
     enum class ExprKind {
         Integer,
@@ -41,7 +42,6 @@ namespace JAOT::IR {
     enum class StatementKind {
         AssignLocal,
         Evaluate,
-        Return,
     };
 
     struct Statement {
@@ -51,12 +51,36 @@ namespace JAOT::IR {
         std::unique_ptr<Expr> expression;
     };
 
+    enum class TerminatorKind {
+        Jump,
+        Branch,
+        Return,
+    };
+
+    struct Terminator {
+        TerminatorKind kind = TerminatorKind::Return;
+        SourceLocation location {};
+
+        BlockId target = 0;
+        BlockId trueTarget = 0;
+        BlockId falseTarget = 0;
+
+        std::unique_ptr<Expr> condition;
+        std::unique_ptr<Expr> expression;
+    };
+
+    struct BasicBlock {
+        BlockId id = 0;
+        std::vector<Statement> statements;
+        Terminator terminator;
+    };
+
     struct Method {
         std::string name;
         Type returnType;
         std::vector<LocalId> parameters;
         std::vector<Local> locals;
-        std::vector<Statement> statements;
+        std::vector<BasicBlock> blocks;
     };
 
     struct Program {
