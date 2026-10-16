@@ -1,5 +1,7 @@
 #include "jaot/ir_lowering.h"
 
+#include "jaot/parser.h"
+
 #include <unordered_map>
 
 namespace JAOT {

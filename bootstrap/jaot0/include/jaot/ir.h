@@ -1,6 +1,11 @@
 #pragma once
 
-#include "jaot/parser.h"
+#include "jaot/types.h"
+
+#include <cstdint>
+#include <string>
+#include <memory>
+#include <vector>
 
 namespace JAOT::IR {
     using LocalId = std::uint32_t;

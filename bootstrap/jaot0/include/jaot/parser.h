@@ -1,6 +1,7 @@
 #pragma once
 
 #include "jaot/token.h"
+#include "jaot/types.h"
 
 #include <memory>
 #include <cstdint>
@@ -8,16 +9,6 @@
 #include <vector>
 
 namespace JAOT {
-    enum class Type {
-        Int,
-        Void,
-    };
-
-    struct SourceLocation {
-        std::size_t line;
-        std::size_t column;
-    };
-
     enum class ExprKind {
         Integer,
         Variable,

@@ -3,6 +3,8 @@
 #include "jaot/ir.h"
 
 namespace JAOT {
+    struct Program;
+
     class IrLowerer {
     public:
         IR::Program lower(const Program &program) const;
