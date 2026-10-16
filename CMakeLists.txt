@@ -100,228 +100,58 @@ set(JAOT0_TEST_OUTPUT_DIR
         "${CMAKE_CURRENT_BINARY_DIR}/tests/programs/jaot0"
 )
 
-add_test(
-        NAME jaot0_compile_hello
-        COMMAND
-        ${CMAKE_COMMAND}
-        -DJAOT0=$<TARGET_FILE:jaot0>
-        -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/hello.jaot
-        -DEXPECTED_OUTPUT_FILE=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/hello.expected
-        -DOUTPUT_DIR=${JAOT0_TEST_OUTPUT_DIR}
-        -DCXX=${CMAKE_CXX_COMPILER}
-        -DRUNTIME=$<TARGET_FILE:jaot_runtime>
-        -DLAUNCHER=${CMAKE_CURRENT_SOURCE_DIR}/tests/runtime/launcher.cpp
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_test.cmake
-)
+set(JAOT0_PROGRAM_DIR "${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0")
+# Each .jaot test requires exactly one sidecar: .expected, .error, or .runtime-fail.
+file(GLOB JAOT0_PROGRAMS CONFIGURE_DEPENDS "${JAOT0_PROGRAM_DIR}/*.jaot")
 
-add_test(
-        NAME jaot0_compile_functions
-        COMMAND
-        ${CMAKE_COMMAND}
-        -DJAOT0=$<TARGET_FILE:jaot0>
-        -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/functions.jaot
-        -DEXPECTED_OUTPUT_FILE=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/functions.expected
-        -DOUTPUT_DIR=${JAOT0_TEST_OUTPUT_DIR}
-        -DCXX=${CMAKE_CXX_COMPILER}
-        -DRUNTIME=$<TARGET_FILE:jaot_runtime>
-        -DLAUNCHER=${CMAKE_CURRENT_SOURCE_DIR}/tests/runtime/launcher.cpp
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_test.cmake
-)
+foreach(JAOT0_INPUT IN LISTS JAOT0_PROGRAMS)
+    get_filename_component(JAOT0_PROGRAM_NAME "${JAOT0_INPUT}" NAME_WE)
+    set(JAOT0_EXPECTED_OUTPUT
+            "${JAOT0_PROGRAM_DIR}/${JAOT0_PROGRAM_NAME}.expected")
+    set(JAOT0_EXPECTED_ERROR
+            "${JAOT0_PROGRAM_DIR}/${JAOT0_PROGRAM_NAME}.error")
+    set(JAOT0_EXPECT_RUNTIME_FAILURE
+            "${JAOT0_PROGRAM_DIR}/${JAOT0_PROGRAM_NAME}.runtime-fail")
 
-add_test(
-        NAME jaot0_compile_assignment
-        COMMAND
-        ${CMAKE_COMMAND}
-        -DJAOT0=$<TARGET_FILE:jaot0>
-        -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/assignment.jaot
-        -DEXPECTED_OUTPUT_FILE=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/assignment.expected
-        -DOUTPUT_DIR=${JAOT0_TEST_OUTPUT_DIR}
-        -DCXX=${CMAKE_CXX_COMPILER}
-        -DRUNTIME=$<TARGET_FILE:jaot_runtime>
-        -DLAUNCHER=${CMAKE_CURRENT_SOURCE_DIR}/tests/runtime/launcher.cpp
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_test.cmake
-)
+    set(JAOT0_EXPECTATION_COUNT 0)
+    foreach(JAOT0_EXPECTATION
+            "${JAOT0_EXPECTED_OUTPUT}"
+            "${JAOT0_EXPECTED_ERROR}"
+            "${JAOT0_EXPECT_RUNTIME_FAILURE}")
+        if(EXISTS "${JAOT0_EXPECTATION}")
+            math(EXPR JAOT0_EXPECTATION_COUNT
+                    "${JAOT0_EXPECTATION_COUNT} + 1")
+        endif()
+    endforeach()
 
-add_test(
-        NAME jaot0_compile_if_else
-        COMMAND
-        ${CMAKE_COMMAND}
-        -DJAOT0=$<TARGET_FILE:jaot0>
-        -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/if_else.jaot
-        -DEXPECTED_OUTPUT_FILE=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/if_else.expected
-        -DOUTPUT_DIR=${JAOT0_TEST_OUTPUT_DIR}
-        -DCXX=${CMAKE_CXX_COMPILER}
-        -DRUNTIME=$<TARGET_FILE:jaot_runtime>
-        -DLAUNCHER=${CMAKE_CURRENT_SOURCE_DIR}/tests/runtime/launcher.cpp
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_test.cmake
-)
+    if(NOT JAOT0_EXPECTATION_COUNT EQUAL 1)
+        message(FATAL_ERROR
+                "JAOT0 test '${JAOT0_PROGRAM_NAME}' must have exactly one "
+                "expectation sidecar: .expected, .error, or .runtime-fail")
+    endif()
 
-add_test(
-        NAME jaot0_compile_declaration_assignment
-        COMMAND
-        ${CMAKE_COMMAND}
-        -DJAOT0=$<TARGET_FILE:jaot0>
-        -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/declaration_assignment.jaot
-        -DEXPECTED_OUTPUT_FILE=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/declaration_assignment.expected
-        -DOUTPUT_DIR=${JAOT0_TEST_OUTPUT_DIR}
-        -DCXX=${CMAKE_CXX_COMPILER}
-        -DRUNTIME=$<TARGET_FILE:jaot_runtime>
-        -DLAUNCHER=${CMAKE_CURRENT_SOURCE_DIR}/tests/runtime/launcher.cpp
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_test.cmake
-)
+    set(JAOT0_TEST_NAME "jaot0_${JAOT0_PROGRAM_NAME}")
+    set(JAOT0_TEST_COMMAND
+            "${CMAKE_COMMAND}"
+            "-DJAOT0=$<TARGET_FILE:jaot0>"
+            "-DINPUT=${JAOT0_INPUT}"
+            "-DOUTPUT_DIR=${JAOT0_TEST_OUTPUT_DIR}"
+            "-DCXX=${CMAKE_CXX_COMPILER}"
+            "-DRUNTIME=$<TARGET_FILE:jaot_runtime>"
+            "-DLAUNCHER=${CMAKE_CURRENT_SOURCE_DIR}/tests/runtime/launcher.cpp")
 
-add_test(
-        NAME jaot0_semantic_uninitialized_variable
-        COMMAND
-        ${CMAKE_COMMAND}
-        -DJAOT0=$<TARGET_FILE:jaot0>
-        -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/uninitialized_variable.jaot
-        -DOUTPUT=${JAOT0_TEST_OUTPUT_DIR}/uninitialized-variable.s
-        "-DEXPECTED_ERROR=variable used before initialization: x"
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_semantic_error.cmake
-)
+    if(EXISTS "${JAOT0_EXPECTED_OUTPUT}")
+        list(APPEND JAOT0_TEST_COMMAND
+                "-DEXPECTED_OUTPUT_FILE=${JAOT0_EXPECTED_OUTPUT}")
+    elseif(EXISTS "${JAOT0_EXPECTED_ERROR}")
+        list(APPEND JAOT0_TEST_COMMAND
+                "-DEXPECTED_ERROR_FILE=${JAOT0_EXPECTED_ERROR}")
+    else()
+        list(APPEND JAOT0_TEST_COMMAND "-DEXPECT_RUNTIME_FAILURE=ON")
+    endif()
 
-add_test(
-        NAME jaot0_compile_division
-        COMMAND
-        ${CMAKE_COMMAND}
-        -DJAOT0=$<TARGET_FILE:jaot0>
-        -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/division.jaot
-        -DEXPECTED_OUTPUT_FILE=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/division.expected
-        -DOUTPUT_DIR=${JAOT0_TEST_OUTPUT_DIR}
-        -DCXX=${CMAKE_CXX_COMPILER}
-        -DRUNTIME=$<TARGET_FILE:jaot_runtime>
-        -DLAUNCHER=${CMAKE_CURRENT_SOURCE_DIR}/tests/runtime/launcher.cpp
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_test.cmake
-)
-
-add_test(
-        NAME jaot0_division_by_zero
-        COMMAND
-        ${CMAKE_COMMAND}
-        -DJAOT0=$<TARGET_FILE:jaot0>
-        -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/division_by_zero.jaot
-        -DEXPECT_RUNTIME_FAILURE=ON
-        -DOUTPUT_DIR=${JAOT0_TEST_OUTPUT_DIR}
-        -DCXX=${CMAKE_CXX_COMPILER}
-        -DRUNTIME=$<TARGET_FILE:jaot_runtime>
-        -DLAUNCHER=${CMAKE_CURRENT_SOURCE_DIR}/tests/runtime/launcher.cpp
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_test.cmake
-)
-
-add_test(
-        NAME jaot0_semantic_unknown_variable
-        COMMAND
-        ${CMAKE_COMMAND}
-        -DJAOT0=$<TARGET_FILE:jaot0>
-        -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/missing.jaot
-        -DOUTPUT=${JAOT0_TEST_OUTPUT_DIR}/missing-semantic.s
-        "-DEXPECTED_ERROR=unknown variable: missing"
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_semantic_error.cmake
-)
-
-add_test(
-        NAME jaot0_semantic_assignment_unknown_variable
-        COMMAND
-        ${CMAKE_COMMAND}
-        -DJAOT0=$<TARGET_FILE:jaot0>
-        -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/assignment_unknown_variable.jaot
-        -DOUTPUT=${JAOT0_TEST_OUTPUT_DIR}/assignment-unknown-variable.s
-        "-DEXPECTED_ERROR=unknown variable: missing"
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_semantic_error.cmake
-)
-
-add_test(
-        NAME jaot0_semantic_missing_return
-        COMMAND
-        ${CMAKE_COMMAND}
-        -DJAOT0=$<TARGET_FILE:jaot0>
-        -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/missing_return.jaot
-        -DOUTPUT=${JAOT0_TEST_OUTPUT_DIR}/missing-return.s
-        "-DEXPECTED_ERROR=int method must return a value"
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_semantic_error.cmake
-)
-
-add_test(
-        NAME jaot0_compile_comments
-        COMMAND
-        ${CMAKE_COMMAND}
-        -DJAOT0=$<TARGET_FILE:jaot0>
-        -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/comments.jaot
-        -DEXPECTED_OUTPUT_FILE=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/comments.expected
-        -DOUTPUT_DIR=${JAOT0_TEST_OUTPUT_DIR}
-        -DCXX=${CMAKE_CXX_COMPILER}
-        -DRUNTIME=$<TARGET_FILE:jaot_runtime>
-        -DLAUNCHER=${CMAKE_CURRENT_SOURCE_DIR}/tests/runtime/launcher.cpp
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_test.cmake
-)
-
-add_test(
-        NAME jaot0_semantic_missing_main
-        COMMAND
-        ${CMAKE_COMMAND}
-        -DJAOT0=$<TARGET_FILE:jaot0>
-        -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/missing_main.jaot
-        -DOUTPUT=${JAOT0_TEST_OUTPUT_DIR}/missing-main-semantic.s
-        "-DEXPECTED_ERROR=missing required entry point 'main' (expected static void main())"
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_semantic_error.cmake
-)
-
-add_test(
-        NAME jaot0_semantic_invalid_main_signature
-        COMMAND
-        ${CMAKE_COMMAND}
-        -DJAOT0=$<TARGET_FILE:jaot0>
-        -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/invalid_main_signature.jaot
-        -DOUTPUT=${JAOT0_TEST_OUTPUT_DIR}/invalid-main-signature-semantic.s
-        "-DEXPECTED_ERROR=entry point 'main' must have signature 'static void main()'"
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_semantic_error.cmake
-)
-
-add_test(
-        NAME jaot0_semantic_integer_bounds
-        COMMAND
-        ${CMAKE_COMMAND}
-        -DJAOT0=$<TARGET_FILE:jaot0>
-        -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/integer_too_large.jaot
-        -DOUTPUT=${JAOT0_TEST_OUTPUT_DIR}/integer-too-large.s
-        "-DEXPECTED_ERROR=integer literal out of 32-bit range"
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_semantic_error.cmake
-)
-
-add_test(
-        NAME jaot0_semantic_integer_below_bounds
-        COMMAND
-        ${CMAKE_COMMAND}
-        -DJAOT0=$<TARGET_FILE:jaot0>
-        -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/integer_too_small.jaot
-        -DOUTPUT=${JAOT0_TEST_OUTPUT_DIR}/integer-too-small.s
-        "-DEXPECTED_ERROR=integer literal out of 32-bit range"
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_semantic_error.cmake
-)
-
-add_test(
-        NAME jaot0_compile_integer_bounds
-        COMMAND
-        ${CMAKE_COMMAND}
-        -DJAOT0=$<TARGET_FILE:jaot0>
-        -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/integer_bounds.jaot
-        -DEXPECTED_OUTPUT_FILE=${CMAKE_CURRENT_SOURCE_DIR}/tests/programs/jaot0/integer_bounds.expected
-        -DOUTPUT_DIR=${JAOT0_TEST_OUTPUT_DIR}
-        -DCXX=${CMAKE_CXX_COMPILER}
-        -DRUNTIME=$<TARGET_FILE:jaot_runtime>
-        -DLAUNCHER=${CMAKE_CURRENT_SOURCE_DIR}/tests/runtime/launcher.cpp
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_test.cmake
-)
-
-set_tests_properties(
-        jaot0_compile_hello
-        jaot0_compile_functions
-        jaot0_compile_assignment
-        jaot0_compile_if_else
-        jaot0_compile_declaration_assignment
-        jaot0_compile_division
-        jaot0_compile_integer_bounds
-        PROPERTIES
-        DEPENDS jaot0_help
-)
+    list(APPEND JAOT0_TEST_COMMAND
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/run_jaot0_test.cmake")
+    add_test(NAME "${JAOT0_TEST_NAME}" COMMAND ${JAOT0_TEST_COMMAND})
+    set_tests_properties("${JAOT0_TEST_NAME}" PROPERTIES DEPENDS jaot0_help)
+endforeach()

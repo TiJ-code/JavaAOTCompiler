@@ -22,6 +22,22 @@ if(NOT DEFINED LAUNCHER)
     message(FATAL_ERROR "LAUNCHER was not provided")
 endif()
 
+set(EXPECTATION_COUNT 0)
+if(DEFINED EXPECTED_OUTPUT_FILE)
+    math(EXPR EXPECTATION_COUNT "${EXPECTATION_COUNT} + 1")
+endif()
+if(DEFINED EXPECTED_ERROR_FILE)
+    math(EXPR EXPECTATION_COUNT "${EXPECTATION_COUNT} + 1")
+endif()
+if(DEFINED EXPECT_RUNTIME_FAILURE AND EXPECT_RUNTIME_FAILURE)
+    math(EXPR EXPECTATION_COUNT "${EXPECTATION_COUNT} + 1")
+endif()
+if(NOT EXPECTATION_COUNT EQUAL 1)
+    message(FATAL_ERROR
+            "Exactly one of EXPECTED_OUTPUT_FILE, EXPECTED_ERROR_FILE, or "
+            "EXPECT_RUNTIME_FAILURE must be specified")
+endif()
+
 file(MAKE_DIRECTORY "${OUTPUT_DIR}")
 
 get_filename_component(PROGRAM_NAME "${INPUT}" NAME_WE)
@@ -43,6 +59,32 @@ execute_process(
         OUTPUT_VARIABLE COMPILE_OUTPUT
         ERROR_VARIABLE COMPILE_ERROR
 )
+
+if(DEFINED EXPECTED_ERROR_FILE)
+    if(COMPILE_RESULT EQUAL 0)
+        message(FATAL_ERROR
+                "jaot0 unexpectedly succeeded for ${INPUT}\n"
+                "stdout:\n${COMPILE_OUTPUT}\n"
+                "stderr:\n${COMPILE_ERROR}")
+    endif()
+
+    if(NOT EXISTS "${EXPECTED_ERROR_FILE}")
+        message(FATAL_ERROR "Expected diagnostic file not found: ${EXPECTED_ERROR_FILE}")
+    endif()
+
+    file(READ "${EXPECTED_ERROR_FILE}" EXPECTED_ERROR)
+    string(STRIP "${EXPECTED_ERROR}" EXPECTED_ERROR)
+    string(FIND "${COMPILE_ERROR}" "${EXPECTED_ERROR}" ERROR_POSITION)
+    if(ERROR_POSITION EQUAL -1)
+        message(FATAL_ERROR
+                "Expected diagnostic '${EXPECTED_ERROR}' was not found for ${INPUT}\n"
+                "stdout:\n${COMPILE_OUTPUT}\n"
+                "stderr:\n${COMPILE_ERROR}")
+    endif()
+
+    message(STATUS "Compiler rejected ${INPUT} with the expected diagnostic")
+    return()
+endif()
 
 if(NOT COMPILE_RESULT EQUAL 0)
     message(FATAL_ERROR
@@ -134,6 +176,11 @@ if(NOT RUN_RESULT EQUAL 0)
 endif()
 
 if(DEFINED EXPECTED_OUTPUT_FILE)
+    if(NOT EXISTS "${EXPECTED_OUTPUT_FILE}")
+        message(FATAL_ERROR
+                "Expected output file not found: ${EXPECTED_OUTPUT_FILE}")
+    endif()
+
     file(READ "${EXPECTED_OUTPUT_FILE}" EXPECTED_OUTPUT)
 
     if(NOT RUN_OUTPUT STREQUAL EXPECTED_OUTPUT)
