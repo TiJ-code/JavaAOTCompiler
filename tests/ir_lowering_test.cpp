@@ -3,6 +3,8 @@
 #include <iostream>
 #include <ostream>
 #include <stdexcept>
+#include <string>
+#include <vector>
 
 #include "jaot/lexer.h"
 #include "jaot/parser.h"
@@ -54,16 +56,20 @@ int main() {
             "first 'add' local should be parameter 'a'");
         require(add.locals[1].name == "b",
             "second 'add' local should be parameter 'b'");
-        require(add.statements.size() == 1,
-            "'add' should lower to one statement");
+        require(add.blocks.size() == 1,
+            "'add' should lower to one basic block");
 
-        const JAOT::IR::Statement &returnStatement = add.statements[0];
-        require(returnStatement.kind == JAOT::IR::StatementKind::Return,
-            "'add' statement should be a return statement");
-        require(returnStatement.expression != nullptr,
+        const JAOT::IR::BasicBlock &addEntry = add.blocks[0];
+        require(addEntry.id == 0,
+            "'add' entry block should have ID 0");
+        require(addEntry.statements.empty(),
+            "'add' return should be represented by its terminator");
+        require(addEntry.terminator.kind == JAOT::IR::TerminatorKind::Return,
+            "'add' entry block should end with a return");
+        require(addEntry.terminator.expression != nullptr,
             "'add' return should have an expression");
 
-        const JAOT::IR::Expr &sum = *returnStatement.expression;
+        const JAOT::IR::Expr &sum = *addEntry.terminator.expression;
         require(sum.kind == JAOT::IR::ExprKind::Binary,
             "'add' return statement should be a binary expression");
         require(sum.binaryOperator == '+',
@@ -83,10 +89,20 @@ int main() {
         require(main.locals.size() == 1 &&
             main.locals[0].name == "result",
             "uninitialized declaration should create a local");
-        require(main.statements.size() == 2,
-            "'main' should lower to assignment and call statements");
+        require(main.blocks.size() == 1,
+            "'main' should lower to one basic block");
 
-        const JAOT::IR::Statement &assignment = main.statements[0];
+        const JAOT::IR::BasicBlock &mainEntry = main.blocks[0];
+        require(mainEntry.id == 0,
+            "'main' entry block should have ID 0");
+        require(mainEntry.statements.size() == 2,
+            "'main' should lower to assignment and call statements");
+        require(mainEntry.terminator.kind == JAOT::IR::TerminatorKind::Return,
+            "'main' should end with an implicit return");
+        require(mainEntry.terminator.expression == nullptr,
+            "implicit void return should not have an expression");
+
+        const JAOT::IR::Statement &assignment = mainEntry.statements[0];
         require(assignment.kind == JAOT::IR::StatementKind::AssignLocal,
             "first 'main' statement should be an assignment");
         require(assignment.target == main.locals[0].id,
@@ -101,10 +117,14 @@ int main() {
             "assignment should call 'add' with two arguments");
         require(call.arguments[0]->kind == JAOT::IR::ExprKind::Integer,
             "first 'add' argument should be 20");
+        require(call.arguments[0]->integer == 20,
+            "first 'add' argument should have value 20");
         require(call.arguments[1]->kind == JAOT::IR::ExprKind::Integer,
             "second 'add' argument should be 22");
+        require(call.arguments[1]->integer == 22,
+            "second 'add' argument should have value 22");
 
-        const JAOT::IR::Statement &printStatement = main.statements[1];
+        const JAOT::IR::Statement &printStatement = mainEntry.statements[1];
         require(printStatement.kind == JAOT::IR::StatementKind::Evaluate,
             "second 'main' statement should be an expression");
         require(printStatement.expression &&
