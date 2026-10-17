@@ -1,0 +1,11 @@
+class Node {
+}
+
+class Main {
+    static void main() {
+        Node node = new Node();
+        printBool(node == null);
+        node = null;
+        printBool(node == null);
+    }
+}

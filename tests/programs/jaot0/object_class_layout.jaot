@@ -1,0 +1,11 @@
+class Cell {
+    int value;
+    boolean active;
+    Cell next;
+}
+
+class Main {
+    static void main() {
+        printBool(new Cell() == null);
+    }
+}
