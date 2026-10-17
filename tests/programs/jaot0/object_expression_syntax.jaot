@@ -1,0 +1,9 @@
+class Node {
+}
+
+class Main {
+    static void main() {
+        new Node();
+        null;
+    }
+}
