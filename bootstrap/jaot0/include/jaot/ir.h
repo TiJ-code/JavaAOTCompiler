@@ -89,7 +89,18 @@ namespace JAOT::IR {
         std::vector<BasicBlock> blocks;
     };
 
+    struct Field {
+        std::string name;
+        std::string typeName;
+    };
+
+    struct Class {
+        std::string name;
+        std::vector<Field> fields;
+    };
+
     struct Program {
+        std::vector<Class> classes;
         std::vector<Method> methods;
     };
 }

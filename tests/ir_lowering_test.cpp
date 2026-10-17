@@ -78,7 +78,34 @@ int main() {
             "Link should have a Node reference field");
 
         JAOT::IrLowerer lowerer;
-        const JAOT::IR::Program ir = lowerer.lower(ast);
+        const JAOT::IR::Program &ir = lowerer.lower(ast);
+
+        require(ir.classes.size() == 3,
+    "expected three IR classes");
+
+        require(ir.classes[0].name == "Node",
+            "first IR class should be Node");
+        require(ir.classes[0].fields.size() == 3,
+            "IR Node should have three fields");
+        require(ir.classes[0].fields[0].name == "value" &&
+                ir.classes[0].fields[0].typeName == "int",
+            "first IR Node field should be int value");
+        require(ir.classes[0].fields[1].name == "marked" &&
+                ir.classes[0].fields[1].typeName == "boolean",
+            "second IR Node field should be boolean marked");
+        require(ir.classes[0].fields[2].name == "next" &&
+                ir.classes[0].fields[2].typeName == "Link",
+            "third IR Node field should be Link next");
+
+        require(ir.classes[1].name == "Main" &&
+                ir.classes[1].fields.empty(),
+            "IR Main should have no fields");
+
+        require(ir.classes[2].name == "Link" &&
+                ir.classes[2].fields.size() == 1 &&
+                ir.classes[2].fields[0].name == "previous" &&
+                ir.classes[2].fields[0].typeName == "Node",
+            "IR Link should have a Node reference field");
 
         require(ir.methods.size() == 2,
             "expected two lowered methods");

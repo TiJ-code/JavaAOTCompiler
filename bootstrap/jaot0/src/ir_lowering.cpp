@@ -359,7 +359,19 @@ namespace JAOT {
         }
 
         IR::Program result;
-        result.methods.reserve(methodCount);
+        result.classes.reserve(program.classes.size());
+
+        for (const ClassDeclaration &declaration : program.classes) {
+            IR::Class irClass;
+            irClass.name = declaration.name;
+            irClass.fields.reserve(declaration.fields.size());
+
+            for (const Field &field : declaration.fields) {
+                irClass.fields.push_back({.name = field.name, .typeName = field.typeName});
+            }
+
+            result.classes.push_back(std::move(irClass));
+        }
 
         for (const ClassDeclaration &declaration : program.classes) {
             for (const Method &method : declaration.methods) {
