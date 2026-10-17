@@ -5,6 +5,7 @@
 #include <limits>
 #include <optional>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -18,8 +19,10 @@ namespace JAOT {
 
         class MethodLowerer {
         public:
-            explicit MethodLowerer(const MethodReturnTypes &returnTypes)
-                : returnTypes_(returnTypes) {}
+            MethodLowerer(
+                const MethodReturnTypes &returnTypes,
+                const std::unordered_set<std::string> &classNames)
+                : returnTypes_(returnTypes), classNames_(classNames) {}
 
             IR::Method lower(const Method &method) {
                 result_.name = method.name;
@@ -124,6 +127,21 @@ namespace JAOT {
                         lowered->kind = IR::ExprKind::Boolean;
                         lowered->type = Type::Boolean;
                         lowered->boolean = expression.boolean;
+                        return lowered;
+
+                    case ExprKind::Null:
+                        lowered->kind = IR::ExprKind::Null;
+                        lowered->type = Type::Reference;
+                        return lowered;
+
+                    case ExprKind::NewObject:
+                        if (!classNames_.contains(expression.className)) {
+                            loweringError(
+                                "unknown class: " + expression.className);
+                        }
+                        lowered->kind = IR::ExprKind::NewObject;
+                        lowered->type = Type::Reference;
+                        lowered->className = expression.className;
                         return lowered;
 
                     case ExprKind::Variable:
@@ -338,6 +356,7 @@ namespace JAOT {
             }
 
             const MethodReturnTypes &returnTypes_;
+            const std::unordered_set<std::string> &classNames_;
             IR::Method result_;
             std::vector<std::unordered_map<std::string, IR::LocalId>> scopes_;
             std::optional<IR::BlockId> currentBlock_;
@@ -346,9 +365,11 @@ namespace JAOT {
 
     IR::Program IrLowerer::lower(const Program &program) const {
         MethodReturnTypes returnTypes;
+        std::unordered_set<std::string> classNames;
         std::size_t methodCount = 0;
 
         for (const ClassDeclaration &declaration : program.classes) {
+            classNames.insert(declaration.name);
             methodCount += declaration.methods.size();
 
             for (const Method &method : declaration.methods) {
@@ -373,9 +394,11 @@ namespace JAOT {
             result.classes.push_back(std::move(irClass));
         }
 
+        result.methods.reserve(methodCount);
+
         for (const ClassDeclaration &declaration : program.classes) {
             for (const Method &method : declaration.methods) {
-                MethodLowerer lowerer(returnTypes);
+                MethodLowerer lowerer(returnTypes, classNames);
                 result.methods.push_back(lowerer.lower(method));
             }
         }

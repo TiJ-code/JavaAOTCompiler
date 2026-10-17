@@ -14,6 +14,8 @@ namespace JAOT::IR {
     enum class ExprKind {
         Integer,
         Boolean,
+        Null,
+        NewObject,
         Local,
         Unary,
         Binary,
@@ -28,6 +30,7 @@ namespace JAOT::IR {
         std::int64_t integer = 0;
         bool boolean = false;
         LocalId local = 0;
+        std::string className;
         std::string binaryOperator;
         std::string unaryOperator;
         std::string callee;

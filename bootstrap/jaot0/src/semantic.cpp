@@ -53,6 +53,10 @@ namespace JAOT {
                 case ExprKind::Boolean:
                     return Type::Boolean;
 
+                case ExprKind::Null:
+                case ExprKind::NewObject:
+                    return Type::Reference;
+
                 case ExprKind::Variable: {
                     const Symbol *symbol = findSymbol(scopes, expression.name);
                     if (symbol == nullptr) {
@@ -96,7 +100,9 @@ namespace JAOT {
 
                     if (expression.op == "==" || expression.op == "!=") {
                         if (left != right ||
-                            (left != Type::Int && left != Type::Boolean)) {
+                            (left != Type::Int &&
+                             left != Type::Boolean &&
+                             left != Type::Reference)) {
                             semanticError(
                                 expression.location,
                                 "equality operands must have the same value type");
