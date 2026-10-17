@@ -79,7 +79,9 @@ namespace JAOT {
             IR::LocalId addLocal(
                 const std::string &name,
                 Type type,
-                bool isParameter) {
+                bool isParameter,
+                const std::string &className = {}
+            ) {
                 if (scopes_.back().contains(name)) {
                     loweringError("duplicate local: " + name);
                 }
@@ -91,7 +93,13 @@ namespace JAOT {
                 const auto id =
                     static_cast<IR::LocalId>(result_.locals.size());
                 scopes_.back().emplace(name, id);
-                result_.locals.push_back({id, name, type, isParameter});
+                result_.locals.push_back({
+                    .id = id,
+                    .name = name,
+                    .type = type,
+                    .className = className,
+                    .isParameter = isParameter
+                });
                 return id;
             }
 
@@ -110,6 +118,13 @@ namespace JAOT {
                     loweringError("invalid local id");
                 }
                 return result_.locals[id].type;
+            }
+
+            const std::string &localClassName(IR::LocalId id) const {
+                if (id >= result_.locals.size()) {
+                    loweringError("invalid local id");
+                }
+                return result_.locals[id].className;
             }
 
             std::unique_ptr<IR::Expr> lowerExpression(const Expr &expression) {
@@ -148,6 +163,7 @@ namespace JAOT {
                         lowered->kind = IR::ExprKind::Local;
                         lowered->local = findLocal(expression.name);
                         lowered->type = localType(lowered->local);
+                        lowered->className = localClassName(lowered->local);
                         return lowered;
 
                     case ExprKind::Binary:
@@ -231,7 +247,12 @@ namespace JAOT {
                         }
 
                         const IR::LocalId id = addLocal(
-                            statement.name, statement.declaredType, false);
+                            statement.name,
+                            statement.declaredType,
+                            false,
+                            statement.declaredTypeName
+                        );
+
                         if (initializer) {
                             IR::Statement assignment;
                             assignment.kind = IR::StatementKind::AssignLocal;

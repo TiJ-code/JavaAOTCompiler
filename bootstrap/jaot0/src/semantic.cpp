@@ -1,6 +1,7 @@
 #include "jaot/semantic.h"
 
 #include <algorithm>
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -13,6 +14,7 @@ namespace JAOT {
         struct Symbol {
             Type type;
             std::size_t id;
+            std::string className;
         };
 
         using Scope = std::unordered_map<std::string, Symbol>;
@@ -41,11 +43,43 @@ namespace JAOT {
             return nullptr;
         }
 
+        std::optional<std::string> referenceClassName(
+            const Expr &expression,
+            const Scopes &scopes
+        ) {
+            if (expression.kind == ExprKind::NewObject) {
+                return expression.className;
+            }
+
+            if (expression.kind == ExprKind::Variable) {
+                const Symbol *symbol = findSymbol(scopes, expression.name);
+                if (symbol != nullptr && symbol->type == Type::Reference) {
+                    return symbol->className;
+                }
+            }
+
+            return std::nullopt;
+        }
+
+        bool referenceAssignableTo(
+            const Expr &expression,
+            const Scopes &scopes,
+            const std::string &targetClassName
+        ) {
+            if (expression.kind == ExprKind::Null) {
+                return true;
+            }
+
+            const auto sourceClassName = referenceClassName(expression, scopes);
+            return sourceClassName.has_value() && *sourceClassName == targetClassName;
+        }
+
         Type checkExpression(
             const Expr &expression,
             const Scopes &scopes,
             const Initialized &initialized,
-            const MethodTable &methods) {
+            const MethodTable &methods
+        ) {
             switch (expression.kind) {
                 case ExprKind::Integer:
                     return Type::Int;
@@ -99,6 +133,20 @@ namespace JAOT {
                     }
 
                     if (expression.op == "==" || expression.op == "!=") {
+                        if (left == Type::Reference) {
+                            const auto leftClassName = referenceClassName(*expression.left, scopes);
+                            const auto rightClassName = referenceClassName(*expression.right, scopes);
+
+                            if (leftClassName.has_value() &&
+                                rightClassName.has_value() &&
+                                *leftClassName != *rightClassName) {
+                                semanticError(
+                                    expression.location,
+                                    "equality operands must have the same reference type or be null"
+                                );
+                            }
+                        }
+
                         if (left != right ||
                             (left != Type::Int &&
                              left != Type::Boolean &&
@@ -238,7 +286,8 @@ namespace JAOT {
             Scopes &scopes,
             const MethodTable &methods,
             const Method &method,
-            std::size_t &nextSymbolId) {
+            std::size_t &nextSymbolId
+        ) {
             if (!flow.fallsThrough) {
                 return flow;
             }
@@ -257,18 +306,33 @@ namespace JAOT {
                             scopes,
                             flow.initialized,
                             methods);
-                        if (initializerType != statement.declaredType) {
+
+                        if (statement.declaredType == Type::Reference) {
+                            if (initializerType != Type::Reference ||
+                                !referenceAssignableTo(*statement.expression, scopes, statement.declaredTypeName)) {
+                                semanticError(
+                                    statement.expression->location,
+                                    "reference initializer must have type '" +
+                                    statement.declaredTypeName + "' or null"
+                                );
+                            }
+                        } else if (initializerType != statement.declaredType) {
                             semanticError(
                                 statement.expression->location,
                                 "variable initializer must have type " +
                                 std::string(statement.declaredType == Type::Int
-                                    ? "int" : "boolean"));
+                                    ? "int" : "boolean")
+                            );
                         }
                     }
 
                     const std::size_t id = nextSymbolId++;
                     scopes.back().emplace(
-                        statement.name, Symbol{statement.declaredType, id});
+                        statement.name, Symbol{
+                            statement.declaredType,
+                            id,
+                            statement.declaredTypeName
+                    });
                     if (statement.expression) {
                         flow.initialized.insert(id);
                     }
@@ -285,6 +349,23 @@ namespace JAOT {
 
                     const Type valueType = checkExpression(
                         *statement.expression, scopes, flow.initialized, methods);
+
+                    if (symbol->type == Type::Reference) {
+                        if (valueType != Type::Reference ||
+                            !referenceAssignableTo(*statement.expression, scopes, symbol->className)) {
+                            semanticError(
+                                statement.expression->location,
+                                "reference assignment must have type '" +
+                                symbol->className + "' or null"
+                            );
+                        }
+                    } else if (valueType != symbol->type) {
+                        semanticError(
+                            statement.expression->location,
+                            "assignment value must have the same type as its target"
+                        );
+                    }
+
                     if (valueType != symbol->type) {
                         semanticError(
                             statement.expression->location,
@@ -416,7 +497,7 @@ namespace JAOT {
                 }
                 const std::size_t id = nextSymbolId++;
                 scopes.back().emplace(
-                    parameter.name, Symbol{parameter.type, id});
+                    parameter.name, Symbol{parameter.type, id, {}});
                 flow.initialized.insert(id);
             }
 

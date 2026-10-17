@@ -45,6 +45,7 @@ namespace JAOT::IR {
         LocalId id;
         std::string name;
         Type type;
+        std::string className;
         bool isParameter;
     };
 
