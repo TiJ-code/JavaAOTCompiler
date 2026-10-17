@@ -228,6 +228,9 @@ JAOT0 supports integer and boolean expressions.
 100 - 25
 value >= 0
 enabled == false
+!enabled
+(enabled && ready)
+(value > 0 || enabled)
 ```
 
 Expressions can contain:
@@ -236,7 +239,7 @@ Expressions can contain:
 - boolean literals
 - variables
 - function calls
-- arithmetic and comparison operators
+- arithmetic, comparison, and logical operators
 - parentheses
 
 ## 11. Operators
@@ -249,6 +252,15 @@ The initial operators are:
 | `-`      | subtraction      |
 | `*`      | multiplication   |
 | `/`      | integer division |
+| `<`      | less than        |
+| `<=`     | less than or equal |
+| `>`      | greater than     |
+| `>=`     | greater than or equal |
+| `==`     | equality         |
+| `!=`     | inequality       |
+| `!`      | logical negation |
+| `&&`     | logical and      |
+| `||`     | logical or       |
 
 Integer division truncates toward zero. Dividing by zero terminates the
 program abnormally. The otherwise-overflowing expression
@@ -259,26 +271,33 @@ int a = 10 + 5;
 int b = 10 - 5;
 int c = 10 * 5;
 int d = 10 / 5;
+boolean ok = (a > 0) && (b >= 0);
+boolean flipped = !(ok || false);
 ```
 
-Operator precedence:
+Operator precedence, from highest to lowest:
 
 ```text
+! 
 * /
 + -
 < <= > >=
 == !=
+&&
+||
 ```
 
 Operators at the same precedence level associate from left to right. Arithmetic
 operators require `int` operands and produce an `int`. Relational operators
 require `int` operands and produce a `boolean`. Equality operators require two
-operands of the same type (`int` or `boolean`) and produce a `boolean`.
-Relational comparisons use signed integer values. Logical operators such as
-`&&`, `||`, and `!` are not part of this stage.
+operands of the same type (`int` or `boolean`) and produce a `boolean`. The
+logical negation operator `!` requires a `boolean` operand and produces a
+`boolean`. The logical operators `&&` and `||` require `boolean` operands and
+produce a `boolean`.
 
-An expression's operands are evaluated from left to right. In particular,
-comparisons do not short-circuit.
+Relational comparisons use signed integer values. An expression's operands are
+evaluated from left to right. In particular, comparisons and logical operators do
+not short-circuit.
 
 ## 12. Function Calls
 
