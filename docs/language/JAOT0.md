@@ -296,9 +296,11 @@ logical negation operator `!` requires a `boolean` operand and produces a
 `boolean`. The logical operators `&&` and `||` require `boolean` operands and
 produce a `boolean`.
 
-Relational comparisons use signed integer values. An expression's operands are
-evaluated from left to right. In particular, comparisons and logical operators do
-not short-circuit.
+Relational comparisons use signed integer values. Operands are evaluated from
+left to right. The logical operators `&&` and `||` use Java-style short-circuit
+evaluation: `&&` does not evaluate its right operand when the left operand is
+`false`, and `||` does not evaluate its right operand when the left operand is
+`true`.
 
 ## 12. Function Calls
 
