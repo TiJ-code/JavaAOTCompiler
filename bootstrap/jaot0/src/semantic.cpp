@@ -144,6 +144,25 @@ namespace JAOT {
                         return Type::Void;
                     }
 
+                    if (expression.callee == "printBool") {
+                        if (expression.arguments.size() != 1) {
+                            semanticError(
+                                expression.location,
+                                "printBool expects one argument"
+                            );
+                        }
+                        if (checkExpression(
+                                *expression.arguments[0],
+                                scopes,
+                                initialized,
+                                methods) != Type::Boolean) {
+                            semanticError(
+                                expression.arguments[0]->location,
+                                "printBool arguments must have type boolean");
+                        }
+                        return Type::Void;
+                    }
+
                     const auto found = methods.find(expression.callee);
                     if (found == methods.end()) {
                         semanticError(
@@ -397,8 +416,10 @@ namespace JAOT {
         MethodTable methods;
 
         for (const Method &method : program.methods) {
-            if (method.name == "printInt") {
-                semanticError(method.location, "method name 'printInt' is reserved");
+            if (method.name == "printInt" || method.name == "printBool") {
+                semanticError(
+                    method.location,
+                    "method name '" + method.name + "' is reserved");
             }
             if (!methods.emplace(method.name, &method).second) {
                 semanticError(

@@ -290,6 +290,18 @@ namespace JAOT {
                     return;
                 }
 
+                if (expression.callee == "printBool") {
+                    if (expression.arguments.size() != 1) {
+                        throw std::runtime_error(
+                            "printBool expects one argument");
+                    }
+
+                    generateExpression(*expression.arguments[0]);
+                    out_ << "    movl %eax, %edi\n";
+                    emitCall("jaot_print_bool");
+                    return;
+                }
+
                 const auto method = methods_.find(expression.callee);
                 if (method == methods_.end()) {
                     throw std::runtime_error(

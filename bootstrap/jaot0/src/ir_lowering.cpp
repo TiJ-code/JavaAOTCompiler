@@ -154,7 +154,8 @@ namespace JAOT {
                     case ExprKind::Call: {
                         lowered->kind = IR::ExprKind::Call;
                         lowered->callee = expression.callee;
-                        if (expression.callee == "printInt") {
+                        if (expression.callee == "printInt" ||
+                            expression.callee == "printBool") {
                             lowered->type = Type::Void;
                         } else {
                             const auto found = returnTypes_.find(expression.callee);

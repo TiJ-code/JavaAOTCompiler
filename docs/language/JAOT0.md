@@ -246,21 +246,21 @@ Expressions can contain:
 
 The initial operators are:
 
-| Operator | Meaning          |
-|----------|------------------|
-| `+`      | addition         |
-| `-`      | subtraction      |
-| `*`      | multiplication   |
-| `/`      | integer division |
-| `<`      | less than        |
-| `<=`     | less than or equal |
-| `>`      | greater than     |
+| Operator | Meaning               |
+|----------|-----------------------|
+| `+`      | addition              |
+| `-`      | subtraction           |
+| `*`      | multiplication        |
+| `/`      | integer division      |
+| `<`      | less than             |
+| `<=`     | less than or equal    |
+| `>`      | greater than          |
 | `>=`     | greater than or equal |
-| `==`     | equality         |
-| `!=`     | inequality       |
-| `!`      | logical negation |
-| `&&`     | logical and      |
-| `||`     | logical or       |
+| `==`     | equality              |
+| `!=`     | inequality            |
+| `!`      | logical negation      |
+| `&&`     | logical and           |
+| `\|\|`   | logical or            |
 
 Integer division truncates toward zero. Dividing by zero terminates the
 program abnormally. The otherwise-overflowing expression
@@ -367,21 +367,29 @@ Initially:
 
 ```java
 printInt(int value)
+printBool(boolean value)
 ```
 
-prints an integer followed by a newline.
+`printInt` prints an integer followed by a newline. `printBool` prints either
+`true` or `false` followed by a newline.
 
 ```java
 printInt(42);
+printBool(true);
+printBool(false);
 ```
 
 outputs
 
 ```text
 42
+true
+false
 ```
 
-`printInt` is not a normal JAOT0 method implemented by the program. It is supplied by the native runtime.
+`printInt` and `printBool` are not normal JAOT0 methods implemented by the program. They are supplied by the native runtime.
+
+`printBool` accepts only a `boolean` operand; passing an `int` is a semantic error.
 
 ## 15. Return Statements
 

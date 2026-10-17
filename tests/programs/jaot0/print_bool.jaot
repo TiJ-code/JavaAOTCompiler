@@ -1,0 +1,14 @@
+class Main {
+    static void main() {
+        printBool(true);
+        printBool(false);
+
+        boolean ready = true;
+        boolean done = false;
+
+        printBool(ready);
+        printBool(done);
+        printBool((1 == 1) && (2 < 3));
+        printBool(!done && ready);
+    }
+}
