@@ -140,7 +140,15 @@ namespace JAOT {
                         lowered->type =
                             expression.op == "+" || expression.op == "-" ||
                             expression.op == "*" || expression.op == "/"
-                                ? Type::Int : Type::Boolean;
+                                ? Type::Int
+                                : Type::Boolean;
+                        return lowered;
+
+                    case ExprKind::Unary:
+                        lowered->kind = IR::ExprKind::Unary;
+                        lowered->unaryOperator = expression.op;
+                        lowered->operand = lowerExpression(*expression.operand);
+                        lowered->type = Type::Boolean;
                         return lowered;
 
                     case ExprKind::Call: {

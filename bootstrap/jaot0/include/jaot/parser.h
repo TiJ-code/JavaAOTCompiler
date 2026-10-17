@@ -14,6 +14,7 @@ namespace JAOT {
         Boolean,
         Variable,
         Binary,
+        Unary,
         Call,
     };
 
@@ -25,15 +26,14 @@ namespace JAOT {
         bool boolean = false;
 
         std::string name;
-
         std::string op;
-
         std::string callee;
 
         std::vector<std::unique_ptr<Expr> > arguments;
 
         std::unique_ptr<Expr> left;
         std::unique_ptr<Expr> right;
+        std::unique_ptr<Expr> operand;
     };
 
     enum class StmtKind {
@@ -125,6 +125,10 @@ namespace JAOT {
         std::unique_ptr<Expr> parseUnary();
 
         std::unique_ptr<Expr> parsePrimary();
+
+        std::unique_ptr<Expr> parseLogicalOr();
+
+        std::unique_ptr<Expr> parseLogicalAnd();
 
         std::unique_ptr<Expr> makeBinary(const Token &operatorToken, std::unique_ptr<Expr> left, std::unique_ptr<Expr> right);
 

@@ -104,7 +104,25 @@ namespace JAOT {
                         return Type::Boolean;
                     }
 
+                    if (expression.op == "&&" || expression.op == "||") {
+                        if (left != Type::Boolean || right != Type::Boolean) {
+                            semanticError(expression.location, "logical operators require boolean operands");
+                        }
+
+                        return Type::Boolean;
+                    }
+
                     semanticError(expression.location, "unknown binary operator");
+                }
+
+                case ExprKind::Unary: {
+                    const Type operandType = checkExpression(*expression.operand, scopes, initialized, methods);
+
+                    if (operandType != Type::Boolean) {
+                        semanticError(expression.location, "logical negation requires a boolean operand");
+                    }
+
+                    return Type::Boolean;
                 }
 
                 case ExprKind::Call: {

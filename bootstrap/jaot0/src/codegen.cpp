@@ -156,6 +156,18 @@ namespace JAOT {
                              << "(%rbp), %eax\n";
                         return;
 
+                    case IR::ExprKind::Unary:
+                        if (!expression.operand) {
+                            throw std::runtime_error("incomplete IR unary expression");
+                        }
+                        generateExpression(*expression.operand);
+                        if (expression.unaryOperator == "!") {
+                            out_ << "    xorl $1, %eax\n";
+                            out_ << "    andl $1, %eax\n";
+                            return;
+                        }
+                        throw std::runtime_error("unknown IR unary operator");
+
                     case IR::ExprKind::Binary:
                         if (!expression.left || !expression.right) {
                             throw std::runtime_error(
@@ -214,6 +226,40 @@ namespace JAOT {
                     out_ << zeroLabel << ":\n";
                     out_ << "    ud2\n";
                     out_ << doneLabel << ":\n";
+                } else if (expression.binaryOperator == "&&") {
+                    const std::string endLabel =
+                        ".Ljaot_" + methodName_ + "_logical_and_" +
+                        std::to_string(divisionLabelCounter_++);
+
+                    generateExpression(*expression.left);
+                    out_ << "    testl %eax, %eax\n";
+                    out_ << "    je " << endLabel << "\n";
+
+                    generateExpression(*expression.right);
+                    out_ << "    testl %eax, %eax\n";
+                    out_ << "    setne %al\n";
+                    out_ << "    movzbl %al, %eax\n";
+                    out_ << "    jmp " << endLabel << "_done\n";
+                    out_ << endLabel << ":\n";
+                    out_ << "    movl $0, %eax\n";
+                    out_ << endLabel << "_done:\n";
+                } else if (expression.binaryOperator == "||") {
+                    const std::string endLabel =
+                        ".Ljaot_" + methodName_ + "_logical_or_" +
+                        std::to_string(divisionLabelCounter_++);
+
+                    generateExpression(*expression.left);
+                    out_ << "    testl %eax, %eax\n";
+                    out_ << "    jne " << endLabel << "\n";
+
+                    generateExpression(*expression.right);
+                    out_ << "    testl %eax, %eax\n";
+                    out_ << "    setne %al\n";
+                    out_ << "    movzbl %al, %eax\n";
+                    out_ << "    jmp " << endLabel << "_done\n";
+                    out_ << endLabel << ":\n";
+                    out_ << "    movl $1, %eax\n";
+                    out_ << endLabel << "_done:\n";
                 } else {
                     const std::string condition = [&]() -> std::string {
                         if (expression.binaryOperator == "==") return "e";

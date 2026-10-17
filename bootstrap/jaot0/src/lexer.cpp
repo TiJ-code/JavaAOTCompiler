@@ -112,6 +112,15 @@ namespace JAOT {
 
             case TokenKind::GreaterEqual:
                 return ">=";
+
+            case TokenKind::Bang:
+                return "!";
+
+            case TokenKind::And:
+                return "&&";
+
+            case TokenKind::Or:
+                return "||";
         }
 
         return "unknown";
@@ -325,7 +334,7 @@ namespace JAOT {
                     if (match('=')) {
                         tokens.push_back({TokenKind::BangEqual, "!=", line, column});
                     } else {
-                        error("unexpected character '!'");
+                        tokens.push_back({TokenKind::Bang, "!", line, column});
                     }
                     break;
 
@@ -342,6 +351,22 @@ namespace JAOT {
                         tokens.push_back({TokenKind::GreaterEqual, ">=", line, column});
                     } else {
                         tokens.push_back({TokenKind::Greater, ">", line, column});
+                    }
+                    break;
+
+                case '&':
+                    if (match('&')) {
+                        tokens.push_back({TokenKind::And, "&&", line, column});
+                    } else {
+                        error("unexpected character '&'");
+                    }
+                    break;
+
+                case '|':
+                    if (match('|')) {
+                        tokens.push_back({TokenKind::Or, "||", line, column});
+                    } else {
+                        error("unexpected character '|'");
                     }
                     break;
 

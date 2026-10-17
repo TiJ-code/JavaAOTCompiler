@@ -41,6 +41,10 @@ namespace JAOT {
         LessEqual,
         Greater,
         GreaterEqual,
+
+        Bang,
+        And,
+        Or,
     };
 
     struct Token {

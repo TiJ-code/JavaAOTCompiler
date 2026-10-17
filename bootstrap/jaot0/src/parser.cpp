@@ -296,7 +296,7 @@ namespace JAOT {
     }
 
     std::unique_ptr<Expr> Parser::parseExpression() {
-        return parseEquality();
+        return parseLogicalOr();
     }
 
     std::unique_ptr<Expr> Parser::parseEquality() {
@@ -343,6 +343,17 @@ namespace JAOT {
     }
 
     std::unique_ptr<Expr> Parser::parseUnary() {
+        if (match(TokenKind::Bang)) {
+            const Token bangToken = previous();
+
+            auto expression = std::make_unique<Expr>();
+            expression->kind = ExprKind::Unary;
+            expression->op = "!";
+            expression->operand = parseUnary();
+            expression->location = {.line = bangToken.line, .column = !bangToken.column};
+            return expression;
+        }
+
         if (match(TokenKind::Minus)) {
             const Token minusToken = current();
 
@@ -350,7 +361,7 @@ namespace JAOT {
                 auto expression = std::make_unique<Expr>();
                 expression->kind = ExprKind::Integer;
                 expression->integer = parseIntegerLiteral(previous(), true);
-                expression->location = {minusToken.line, minusToken.column};
+                expression->location = {.line = minusToken.line, .column = minusToken.column};
                 return expression;
             }
 
@@ -419,5 +430,25 @@ namespace JAOT {
         }
 
         error("expected expression");
+    }
+
+    std::unique_ptr<Expr> Parser::parseLogicalOr() {
+        auto left = parseLogicalAnd();
+        while (check(TokenKind::Or)) {
+            const Token operatorToken = current();
+            ++index_;
+            left = makeBinary(operatorToken, std::move(left), parseLogicalAnd());
+        }
+        return left;
+    }
+
+    std::unique_ptr<Expr> Parser::parseLogicalAnd() {
+        auto left = parseEquality();
+        while (check(TokenKind::And)) {
+            const Token operatorToken = current();
+            ++index_;
+            left = makeBinary(operatorToken, std::move(left), parseEquality());
+        }
+        return left;
     }
 } // namespace JAOT

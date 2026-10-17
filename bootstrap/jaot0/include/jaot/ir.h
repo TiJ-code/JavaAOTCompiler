@@ -15,6 +15,7 @@ namespace JAOT::IR {
         Integer,
         Boolean,
         Local,
+        Unary,
         Binary,
         Call,
     };
@@ -28,10 +29,13 @@ namespace JAOT::IR {
         bool boolean = false;
         LocalId local = 0;
         std::string binaryOperator;
+        std::string unaryOperator;
         std::string callee;
+
         std::vector<std::unique_ptr<Expr>> arguments;
         std::unique_ptr<Expr> left;
         std::unique_ptr<Expr> right;
+        std::unique_ptr<Expr> operand;
     };
 
     struct Local {

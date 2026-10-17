@@ -1,0 +1,33 @@
+class Main {
+    static void main() {
+        if (true && true) {
+            printInt(1);
+        } else {
+            printInt(0);
+        }
+
+        if (true && false) {
+            printInt(1);
+        } else {
+            printInt(0);
+        }
+
+        if (false || true) {
+            printInt(1);
+        } else {
+            printInt(0);
+        }
+
+        if (!(1 == 1)) {
+            printInt(1);
+        } else {
+            printInt(0);
+        }
+
+        if (!false) {
+            printInt(1);
+        } else {
+            printInt(0);
+        }
+    }
+}
