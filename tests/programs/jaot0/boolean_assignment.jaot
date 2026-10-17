@@ -1,0 +1,26 @@
+class Main {
+    static void main() {
+        boolean enabled = true;
+        enabled = false;
+
+        if (enabled == false) {
+            printInt(1);
+        } else {
+            printInt(0);
+        }
+
+        boolean same = (enabled == false);
+        if (same) {
+            printInt(1);
+        } else {
+            printInt(0);
+        }
+
+        boolean different = (true != enabled);
+        if (different) {
+            printInt(1);
+        } else {
+            printInt(0);
+        }
+    }
+}

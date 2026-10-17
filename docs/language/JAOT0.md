@@ -76,7 +76,7 @@ class Identifier {
 }
 ```
 
-JAOT0 does not currently support:
+JAOT0 does **not** currently support:
 
 - fields
 - constructors

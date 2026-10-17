@@ -2,6 +2,26 @@
 <project version="4">
   <component name="CidrCTestProjectState">
     <ctestState>
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_assignment" value="154" />
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_assignment_unknown_variable" value="154" />
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_comments" value="154" />
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_declaration_assignment" value="154" />
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_division" value="154" />
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_division_by_zero" value="154" />
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_functions" value="154" />
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_hello" value="154" />
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_help" value="93" />
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_if_else" value="154" />
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_integer_bounds" value="154" />
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_integer_too_large" value="154" />
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_integer_too_small" value="154" />
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_invalid_main_signature" value="154" />
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_ir_header" value="90" />
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_ir_lowering" value="91" />
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_missing" value="154" />
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_missing_main" value="154" />
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_missing_return" value="154" />
+      <lineNumber testId="path:CMakeLists.txt test:jaot0_uninitialized_variable" value="154" />
       <lineNumber testId="path:null test:jaot0_compile_assignment" value="130" />
       <lineNumber testId="path:null test:jaot0_compile_comments" value="244" />
       <lineNumber testId="path:null test:jaot0_compile_declaration_assignment" value="158" />

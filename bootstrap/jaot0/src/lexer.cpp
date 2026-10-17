@@ -331,7 +331,7 @@ namespace JAOT {
 
                 case '<':
                     if (match('=')) {
-                        tokens.push_back({TokenKind::LessEqual, "<", line, column});
+                        tokens.push_back({TokenKind::LessEqual, "<=", line, column});
                     } else {
                         tokens.push_back({TokenKind::Less, "<", line, column});
                     }

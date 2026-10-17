@@ -1,0 +1,51 @@
+class Main {
+    static void main() {
+        if (1 == 1) {
+            printInt(1);
+        } else {
+            printInt(0);
+        }
+
+        if (1 != 2) {
+            printInt(1);
+        } else {
+            printInt(0);
+        }
+
+        if (2 < 5) {
+            printInt(1);
+        } else {
+            printInt(0);
+        }
+
+        if (2 <= 2) {
+            printInt(1);
+        } else {
+            printInt(0);
+        }
+
+        if (5 > 2) {
+            printInt(1);
+        } else {
+            printInt(0);
+        }
+
+        if (5 >= 5) {
+            printInt(1);
+        } else {
+            printInt(0);
+        }
+
+        if (2 < 1) {
+            printInt(1);
+        } else {
+            printInt(0);
+        }
+
+        if (3 >= 4) {
+            printInt(1);
+        } else {
+            printInt(0);
+        }
+    }
+}
