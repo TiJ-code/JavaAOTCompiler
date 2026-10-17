@@ -8,6 +8,16 @@ class Main {
         return value > 0 && value <= 3;
     }
 
+    static boolean markTrue() {
+        printInt(42);
+        return true;
+    }
+
+    static boolean markFalse() {
+        printInt(69);
+        return false;
+    }
+
     static void report(boolean value) {
         if (value) {
             printBool(true);
@@ -49,6 +59,10 @@ class Main {
         printBool(false);
         report(isSmallPositive(1));
         report(isSmallPositive(0));
+        printBool(false && markTrue());
+        printBool(true || markFalse());
+        printBool(true && markTrue());
+        printBool(false || markFalse());
 
         if (result == 5 && (2 < 3 || false)) {
             printInt(1);

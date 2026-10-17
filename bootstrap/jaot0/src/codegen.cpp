@@ -185,6 +185,48 @@ namespace JAOT {
             }
 
             void generateBinary(const IR::Expr &expression) {
+                if (expression.binaryOperator == "&&") {
+                    const std::string label =
+                        ".Ljaot_" + methodName_ + "_logical_and_" +
+                        std::to_string(divisionLabelCounter_++);
+
+                    generateExpression(*expression.left);
+                    out_ << "    testl %eax, %eax\n";
+                    out_ << "    je " << label << "\n";
+
+                    generateExpression(*expression.right);
+                    out_ << "    testl %eax, %eax\n";
+                    out_ << "    setne %al\n";
+                    out_ << "    movzbl %al, %eax\n";
+                    out_ << "    jmp " << label << "_done\n";
+
+                    out_ << label << ":\n";
+                    out_ << "    movl $0, %eax\n";
+                    out_ << label << "_done:\n";
+                    return;
+                }
+
+                if (expression.binaryOperator == "||") {
+                    const std::string label =
+                        ".Ljaot_" + methodName_ + "_logical_or_" +
+                        std::to_string(divisionLabelCounter_++);
+
+                    generateExpression(*expression.left);
+                    out_ << "    testl %eax, %eax\n";
+                    out_ << "    jne " << label << "\n";
+
+                    generateExpression(*expression.right);
+                    out_ << "    testl %eax, %eax\n";
+                    out_ << "    setne %al\n";
+                    out_ << "    movzbl %al, %eax\n";
+                    out_ << "    jmp " << label << "_done\n";
+
+                    out_ << label << ":\n";
+                    out_ << "    movl $1, %eax\n";
+                    out_ << label << "_done:\n";
+                    return;
+                }
+
                 generateExpression(*expression.left);
                 out_ << "    pushq %rax\n";
                 stackDepth_ += 8;
@@ -226,40 +268,6 @@ namespace JAOT {
                     out_ << zeroLabel << ":\n";
                     out_ << "    ud2\n";
                     out_ << doneLabel << ":\n";
-                } else if (expression.binaryOperator == "&&") {
-                    const std::string endLabel =
-                        ".Ljaot_" + methodName_ + "_logical_and_" +
-                        std::to_string(divisionLabelCounter_++);
-
-                    generateExpression(*expression.left);
-                    out_ << "    testl %eax, %eax\n";
-                    out_ << "    je " << endLabel << "\n";
-
-                    generateExpression(*expression.right);
-                    out_ << "    testl %eax, %eax\n";
-                    out_ << "    setne %al\n";
-                    out_ << "    movzbl %al, %eax\n";
-                    out_ << "    jmp " << endLabel << "_done\n";
-                    out_ << endLabel << ":\n";
-                    out_ << "    movl $0, %eax\n";
-                    out_ << endLabel << "_done:\n";
-                } else if (expression.binaryOperator == "||") {
-                    const std::string endLabel =
-                        ".Ljaot_" + methodName_ + "_logical_or_" +
-                        std::to_string(divisionLabelCounter_++);
-
-                    generateExpression(*expression.left);
-                    out_ << "    testl %eax, %eax\n";
-                    out_ << "    jne " << endLabel << "\n";
-
-                    generateExpression(*expression.right);
-                    out_ << "    testl %eax, %eax\n";
-                    out_ << "    setne %al\n";
-                    out_ << "    movzbl %al, %eax\n";
-                    out_ << "    jmp " << endLabel << "_done\n";
-                    out_ << endLabel << ":\n";
-                    out_ << "    movl $1, %eax\n";
-                    out_ << endLabel << "_done:\n";
                 } else {
                     const std::string condition = [&]() -> std::string {
                         if (expression.binaryOperator == "==") return "e";
