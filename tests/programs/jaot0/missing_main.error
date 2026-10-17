@@ -1,1 +1,1 @@
-missing required entry point 'main' (expected static void main())
+missing required entry point 'Main.main' (expected static void main())

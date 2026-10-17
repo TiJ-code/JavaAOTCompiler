@@ -20,6 +20,12 @@ namespace {
 int main() {
     try {
         const std::string source = R"(
+            class Node {
+                int value;
+                boolean marked;
+                Link next;
+            }
+
             class Main {
                 static int add(int a, int b) {
                     return a + b;
@@ -31,11 +37,45 @@ int main() {
                     printInt(result);
                 }
             }
+
+            class Link {
+                Node previous;
+            }
         )";
 
         JAOT::Lexer lexer(source);
         JAOT::Parser parser(lexer.lex());
         const JAOT::Program ast = parser.parse();
+
+        require(ast.classes.size() == 3,
+    "expected three class declarations");
+
+        require(ast.classes[0].name == "Node",
+            "first class should be Node");
+        require(ast.classes[0].fields.size() == 3,
+            "Node should have three fields");
+        require(ast.classes[0].fields[0].typeName == "int" &&
+                ast.classes[0].fields[0].name == "value",
+            "first Node field should be int value");
+        require(ast.classes[0].fields[1].typeName == "boolean" &&
+                ast.classes[0].fields[1].name == "marked",
+            "second Node field should be boolean marked");
+        require(ast.classes[0].fields[2].typeName == "Link" &&
+                ast.classes[0].fields[2].name == "next",
+            "third Node field should be Link next");
+
+        require(ast.classes[1].name == "Main",
+            "second class should be Main");
+        require(ast.classes[1].fields.empty(),
+            "Main should have no fields");
+        require(ast.classes[1].methods.size() == 2,
+            "Main should have two methods");
+
+        require(ast.classes[2].name == "Link",
+            "third class should be Link");
+        require(ast.classes[2].fields.size() == 1 &&
+                ast.classes[2].fields[0].typeName == "Node",
+            "Link should have a Node reference field");
 
         JAOT::IrLowerer lowerer;
         const JAOT::IR::Program ir = lowerer.lower(ast);

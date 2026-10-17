@@ -1,1 +1,1 @@
-entry point 'main' must have signature 'static void main()'
+entry point 'Main.main' must have signature 'static void main()'
