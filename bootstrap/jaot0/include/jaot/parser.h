@@ -55,6 +55,7 @@ namespace JAOT {
         Type declaredType = Type::Int;
 
         std::string name;
+        std::string declaredTypeName;
         std::unique_ptr<Expr> expression;
         std::unique_ptr<Expr> condition;
 
@@ -123,7 +124,9 @@ namespace JAOT {
 
         Stmt parseStatement();
 
-        Stmt parseVariableDeclaration(Type type);
+        Stmt parseVariableDeclaration(
+            Type type,
+            std::string declaredTypeName = {});
 
         Stmt parseAssignment();
 

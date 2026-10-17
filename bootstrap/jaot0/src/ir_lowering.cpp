@@ -219,6 +219,12 @@ namespace JAOT {
             void lowerStatement(const Stmt &statement) {
                 switch (statement.kind) {
                     case StmtKind::VarDecl: {
+                        if (statement.declaredType == Type::Reference &&
+                            !classNames_.contains(statement.declaredTypeName)) {
+                            loweringError(
+                                "unknown class: " + statement.declaredTypeName);
+                        }
+
                         std::unique_ptr<IR::Expr> initializer;
                         if (statement.expression) {
                             initializer = lowerExpression(*statement.expression);

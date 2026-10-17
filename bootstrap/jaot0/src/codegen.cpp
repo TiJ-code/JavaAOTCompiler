@@ -47,8 +47,14 @@ namespace JAOT {
                 }
 
                 for (std::size_t i = 0; i < method.parameters.size(); ++i) {
-                    out_ << "    movl " << ArgumentRegisters32[i] << ", "
-                         << localOffset(method.parameters[i]) << "(%rbp)\n";
+                    const IR::LocalId parameter = method.parameters[i];
+                    if (localType(parameter) == Type::Reference) {
+                        out_ << "    movq " << ArgumentRegisters[i] << ", "
+                             << localOffset(parameter) << "(%rbp)\n";
+                    } else {
+                        out_ << "    movl " << ArgumentRegisters32[i] << ", "
+                             << localOffset(parameter) << "(%rbp)\n";
+                    }
                 }
 
                 for (const IR::BasicBlock &block : method.blocks) {
@@ -63,15 +69,19 @@ namespace JAOT {
             }
 
         private:
-            static constexpr int LocalSize = 4;
+            static int localSize(Type type) {
+                return type == Type::Reference ? 8 : 4;
+            }
 
             void collectLocals(const IR::Method &method) {
                 for (const IR::Local &local : method.locals) {
-                    const int offset = -stackSize_ - LocalSize;
+                    const int size = localSize(local.type);
+                    const int offset = -stackSize_ - size;
                     if (!locals_.emplace(local.id, offset).second) {
                         throw std::runtime_error("duplicate IR local id");
                     }
-                    stackSize_ += LocalSize;
+                    localTypes_.emplace(local.id, local.type);
+                    stackSize_ += size;
                 }
 
                 for (const IR::LocalId parameter : method.parameters) {
@@ -90,7 +100,9 @@ namespace JAOT {
                                 "IR local assignment without value");
                         }
                         generateExpression(*statement.expression);
-                        out_ << "    movl %eax, "
+                        out_ << (localType(statement.target) == Type::Reference
+                                     ? "    movq %rax, "
+                                     : "    movl %eax, ")
                              << localOffset(statement.target)
                              << "(%rbp)\n";
                         return;
@@ -169,8 +181,13 @@ namespace JAOT {
                     }
 
                     case IR::ExprKind::Local:
-                        out_ << "    movl " << localOffset(expression.local)
-                             << "(%rbp), %eax\n";
+                        if (expression.type == Type::Reference) {
+                            out_ << "    movq " << localOffset(expression.local)
+                                 << "(%rbp), %rax\n";
+                        } else {
+                            out_ << "    movl " << localOffset(expression.local)
+                                 << "(%rbp), %eax\n";
+                        }
                         return;
 
                     case IR::ExprKind::Unary:
@@ -388,10 +405,19 @@ namespace JAOT {
                 return found->second;
             }
 
+            Type localType(IR::LocalId id) const {
+                const auto found = localTypes_.find(id);
+                if (found == localTypes_.end()) {
+                    throw std::runtime_error("unknown IR local id");
+                }
+                return found->second;
+            }
+
             std::ostream &out_;
             const std::unordered_map<std::string, std::size_t> &methods_;
             const std::unordered_map<std::string, std::size_t> &classSizes_;
             std::unordered_map<IR::LocalId, int> locals_;
+            std::unordered_map<IR::LocalId, Type> localTypes_;
             int stackSize_ = 0;
             int stackDepth_ = 0;
             std::string methodName_;
