@@ -66,6 +66,12 @@ namespace JAOT {
         SourceLocation location {};
     };
 
+    struct Field {
+        std::string typeName;
+        std::string name;
+        SourceLocation location {};
+    };
+
     struct Method {
         Type returnType;
         std::string name;
@@ -74,10 +80,15 @@ namespace JAOT {
         SourceLocation location {};
     };
 
-    struct Program {
-        std::string className;
-
+    struct ClassDeclaration {
+        std::string name;
+        SourceLocation location {};
+        std::vector<Field> fields;
         std::vector<Method> methods;
+    };
+
+    struct Program {
+        std::vector<ClassDeclaration> classes;
     };
 
     class Parser {
@@ -98,6 +109,10 @@ namespace JAOT {
         const Token &consume(TokenKind kind, const char *message);
 
         Type parseValueType();
+
+        ClassDeclaration parseClass();
+
+        Field parseField();
 
         Method parseMethod();
 

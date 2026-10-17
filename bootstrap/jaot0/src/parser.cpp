@@ -76,24 +76,69 @@ namespace JAOT {
     }
 
     Program Parser::parse() {
-        consume(TokenKind::KwClass, "expected 'class'");
-
-        const auto &className = consume(TokenKind::Identifier, "expected class name");
-
         Program program;
-        program.className = className.text;
+
+        if (check(TokenKind::EndOfFile)) {
+            error("expected 'class'");
+        }
+
+        while (!check(TokenKind::EndOfFile)) {
+            program.classes.push_back(parseClass());
+        }
+
+        consume(TokenKind::EndOfFile, "expected one of file");
+        return program;
+    }
+
+    ClassDeclaration Parser::parseClass() {
+        consume(TokenKind::KwClass, "expected 'class'");
+        const Token &name = consume(TokenKind::Identifier, "expected class name");
+
+        ClassDeclaration declaration;
+        declaration.name = name.text;
+        declaration.location = {.line = name.line, .column = name.column};
 
         consume(TokenKind::LBrace, "expected '{' after class name");
 
-        while (!check(TokenKind::RBrace) && !check(TokenKind::EndOfFile)) {
-            program.methods.push_back(parseMethod());
+        while (!check(TokenKind::KwStatic) &&
+               !check(TokenKind::RBrace) &&
+               !check(TokenKind::EndOfFile)) {
+            declaration.fields.push_back(parseField());
+        }
+
+        while (!check(TokenKind::RBrace) &&
+               !check(TokenKind::EndOfFile)) {
+            declaration.methods.push_back(parseMethod());
         }
 
         consume(TokenKind::RBrace, "expected '}' after class");
+        return declaration;
+    }
 
-        consume(TokenKind::EndOfFile, "expected end of file");
+    Field Parser::parseField() {
+        std::string typeName;
+        SourceLocation typeLocation {};
 
-        return program;
+        if (match(TokenKind::KwInt)) {
+            typeName = "int";
+            typeLocation = {.line = previous().line, .column = previous().column};
+        } else if (match(TokenKind::KwBoolean)) {
+            typeName = "boolean";
+            typeLocation = {.line = previous().line, .column = previous().column};
+        } else {
+            const Token &type = consume(TokenKind::Identifier, "expected field type");
+            typeName = type.text;
+            typeLocation = {.line = previous().line, .column = previous().column};
+        }
+
+        const Token &name = consume(TokenKind::Identifier, "expected field name");
+        consume(TokenKind::Semicolon, "expected ';' after field declaration");
+
+        return {
+            .typeName = typeName,
+            .name = name.text,
+            .location = typeLocation
+        };
     }
 
     Method Parser::parseMethod() {

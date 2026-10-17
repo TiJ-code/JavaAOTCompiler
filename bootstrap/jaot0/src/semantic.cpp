@@ -429,37 +429,96 @@ namespace JAOT {
     }
 
     void SematicAnalyzer::analyze(const Program &program) const {
-        MethodTable methods;
+        std::unordered_set<std::string> classNames;
 
-        for (const Method &method : program.methods) {
-            if (method.name == "printInt" || method.name == "printBool") {
+        for (const ClassDeclaration &declaration : program.classes) {
+            if (!classNames.insert(declaration.name).second) {
                 semanticError(
-                    method.location,
-                    "method name '" + method.name + "' is reserved");
-            }
-            if (!methods.emplace(method.name, &method).second) {
-                semanticError(
-                    method.location, "duplicate function: " + method.name);
+                    declaration.location,
+                    "duplicate class: " + declaration.name
+                );
             }
         }
 
-        const auto entryPoint = methods.find("main");
-        if (entryPoint == methods.end()) {
+        const ClassDeclaration *mainClass = nullptr;
+        for (const ClassDeclaration &declaration : program.classes) {
+            if (declaration.name == "Main") {
+                mainClass = &declaration;
+                break;
+            }
+        }
+
+        if (mainClass == nullptr) {
             throw std::runtime_error(
-                "semantic error: missing required entry point 'main' "
-                "(expected static void main())");
+                "semantic error: missing required class 'Main'"
+            );
         }
 
-        const Method &mainMethod = *entryPoint->second;
-        if (mainMethod.returnType != Type::Void ||
-            !mainMethod.parameters.empty()) {
+        for (const ClassDeclaration &declaration : program.classes) {
+            std::unordered_set<std::string> fieldNames;
+
+            for (const Field &field : declaration.fields) {
+                if (!fieldNames.insert(field.name).second) {
+                    semanticError(
+                        field.location,
+                        "duplicate field: " + field.name
+                    );
+                }
+
+                if (field.typeName != "int" &&
+                    field.typeName != "boolean" &&
+                    !classNames.contains(field.typeName)) {
+                    semanticError(
+                        field.location,
+                        "unknown field: " + field.typeName
+                    );
+                }
+            }
+        }
+
+        MethodTable methods;
+        const Method *mainMethod = nullptr;
+
+        for (const ClassDeclaration &declaration : program.classes) {
+            for (const Method &method : declaration.methods) {
+                if (method.name == "printInt" || method.name == "printBool") {
+                    semanticError(
+                        method.location,
+                        "method name '" + method.name + "' is reserved"
+                    );
+                }
+
+                if (!methods.emplace(method.name, &method).second) {
+                    semanticError(
+                        method.location,
+                        "duplicate function: " + method.name
+                    );
+                }
+
+                if (declaration.name == "Main" && method.name == "main") {
+                    mainMethod = &method;
+                }
+            }
+        }
+
+        if (mainMethod == nullptr) {
+            throw std::runtime_error(
+                "semantic error: missing required entry point 'Main.main' (expected static void main())"
+            );
+        }
+
+        if (mainMethod->returnType != Type::Void ||
+            !mainMethod->parameters.empty()) {
             semanticError(
-                mainMethod.location,
-                "entry point 'main' must have signature 'static void main()'");
+                mainMethod->location,
+                "entry point 'Main.main' must have signature 'static void main()'"
+            );
         }
 
-        for (const Method &method : program.methods) {
-            checkMethod(method, methods);
+        for (const ClassDeclaration &declaration : program.classes) {
+            for (const Method &method : declaration.methods) {
+                checkMethod(method, methods);
+            }
         }
     }
 }

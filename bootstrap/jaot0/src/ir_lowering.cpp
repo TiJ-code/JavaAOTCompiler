@@ -346,18 +346,28 @@ namespace JAOT {
 
     IR::Program IrLowerer::lower(const Program &program) const {
         MethodReturnTypes returnTypes;
-        for (const Method &method : program.methods) {
-            if (!returnTypes.emplace(method.name, method.returnType).second) {
-                loweringError("duplicate method: " + method.name);
+        std::size_t methodCount = 0;
+
+        for (const ClassDeclaration &declaration : program.classes) {
+            methodCount += declaration.methods.size();
+
+            for (const Method &method : declaration.methods) {
+                if (!returnTypes.emplace(method.name, method.returnType).second) {
+                    loweringError("duplicate method: " + method.name);
+                }
             }
         }
 
         IR::Program result;
-        result.methods.reserve(program.methods.size());
-        for (const Method &method : program.methods) {
-            MethodLowerer lowerer(returnTypes);
-            result.methods.push_back(lowerer.lower(method));
+        result.methods.reserve(methodCount);
+
+        for (const ClassDeclaration &declaration : program.classes) {
+            for (const Method &method : declaration.methods) {
+                MethodLowerer lowerer(returnTypes);
+                result.methods.push_back(lowerer.lower(method));
+            }
         }
+
         return result;
     }
 }
