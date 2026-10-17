@@ -52,3 +52,13 @@ At some point the C*+ compiler stops being part of the normal build. It remains 
 This project is intentionally in its early stage.
 
 The interesting part is building those smaller compiler bootstraps, that can build themselves.
+
+## References
+
+The JAOT0 native backend's x86-64 instruction selection, GNU assembler syntax,
+System V calling convention, and stack-frame layout are informed by these
+primary references:
+
+- [System V Application Binary Interface, AMD64 Architecture Processor Supplement](https://gitlab.com/x86-psABIs/x86-64-ABI) — calling convention, register usage, stack alignment, and procedure frames.
+- [GNU `as` manual: i386-Dependent Features](https://sourceware.org/binutils/docs/as/i386_002dDependent.html), including [i386 syntactical considerations](https://sourceware.org/binutils/docs/as/i386_002dSyntax.html) — x86-64 GNU assembler support and AT&T syntax.
+- [Intel 64 and IA-32 Architectures Software Developer Manuals](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html) — instruction behavior and architectural details.

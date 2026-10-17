@@ -360,6 +360,13 @@ padding when needed so the stack is 16-byte aligned immediately before a call.
 The temporary pushes and any call padding do not form part of the method's
 fixed local-variable frame.
 
+The calling convention and stack-frame layout follow the
+[System V AMD64 ABI](https://gitlab.com/x86-psABIs/x86-64-ABI). The emitted
+instruction syntax follows GNU `as`'s
+[i386 syntactical conventions](https://sourceware.org/binutils/docs/as/i386_002dSyntax.html).
+Instruction behavior is based on Intel's
+[64 and IA-32 Software Developer Manuals](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html).
+
 ## 14. Built-in Runtime Functions
 
 JAOT0 provides a very small runtime interface.
