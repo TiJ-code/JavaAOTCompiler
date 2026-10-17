@@ -1,0 +1,75 @@
+/* One program demonstrating JAOT0s currently supported features */
+class Main {
+    static int calculate(int value, int extra) {
+        return value * 2 + extra;
+    }
+
+    static boolean isSmallPositive(int value) {
+        return value > 0 && value <= 3;
+    }
+
+    static void report(boolean value) {
+        if (value) {
+            printBool(true);
+        } else {
+            printBool(false);
+        }
+        return;
+    }
+
+    static void main() {
+        // Locals can be declared before being initialized
+        int total;
+        total = 0;
+
+        int outer = 9;
+        {
+            int outer = 2;
+            printInt(outer);
+        }
+        printInt(outer);
+
+        int result = calculate(2, 1);
+        printInt(result);
+        printInt(2 + 3 * 4);
+        printInt(10 - 3);
+        printInt(17 / 5);
+        printInt(-10);
+
+        boolean checks;
+        checks = (1 < 2) &&
+                 (2 <= 2) &&
+                 (3 > 2) &&
+                 (3 >= 3) &&
+                 (3 == 3) &&
+                 (3 != 4) &&
+                 (true == !false);
+        printBool(checks);
+        printBool(true);
+        printBool(false);
+        report(isSmallPositive(1));
+        report(isSmallPositive(0));
+
+        if (result == 5 && (2 < 3 || false)) {
+            printInt(1);
+        } else {
+            printInt(0);
+        }
+
+        if (result != 0) {
+            total = total + 1;
+        }
+
+        int remaining = 3;
+        while (remaining > 0) {
+            printInt(remaining);
+            if (isSmallPositive(remaining)) {
+                total = total + remaining;
+            } else {
+                total = total + 0;
+            }
+            remaining = remaining - 1;
+        }
+        printInt(total);
+    }
+}
