@@ -203,6 +203,48 @@ int main() {
             printStatement.expression->arguments[0]->local == main.locals[0].id,
             "'printInt' should receive result");
 
+
+
+        const std::string objectExpressionSource = R"(
+            class Main {
+                static void main() {
+                    new Node();
+                    null;
+                }
+            }
+
+            class Node {
+            }
+        )";
+
+        JAOT::Lexer objectExpressionLexer(objectExpressionSource);
+        JAOT::Parser objectExpressionParser(objectExpressionLexer.lex());
+        const JAOT::Program objectExpressionAst = objectExpressionParser.parse();
+
+        require(objectExpressionAst.classes.size() == 2,
+            "object-expression source should parse two classes");
+        require(objectExpressionAst.classes[0].methods.size() == 1,
+            "Main should contain main");
+        require(objectExpressionAst.classes[0].methods[0].body.size() == 2,
+            "main should contain both object expressions");
+
+        const JAOT::Stmt &newStatement =
+            objectExpressionAst.classes[0].methods[0].body[0];
+        require(newStatement.kind == JAOT::StmtKind::Expression &&
+                newStatement.expression &&
+                newStatement.expression->kind == JAOT::ExprKind::NewObject &&
+                newStatement.expression->className == "Node",
+            "new Node() should parse as a Node allocation expression");
+
+        const JAOT::Stmt &nullStatement =
+            objectExpressionAst.classes[0].methods[0].body[1];
+        require(nullStatement.kind == JAOT::StmtKind::Expression &&
+                nullStatement.expression &&
+                nullStatement.expression->kind == JAOT::ExprKind::Null,
+            "null should parse as a null expression");
+
+
+
         return 0;
     } catch (const std::exception &error) {
         std::cerr << error.what() << '\n';

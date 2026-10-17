@@ -12,6 +12,8 @@ namespace JAOT {
     enum class ExprKind {
         Integer,
         Boolean,
+        Null,
+        NewObject,
         Variable,
         Binary,
         Unary,
@@ -28,6 +30,7 @@ namespace JAOT {
         std::string name;
         std::string op;
         std::string callee;
+        std::string className;
 
         std::vector<std::unique_ptr<Expr> > arguments;
 

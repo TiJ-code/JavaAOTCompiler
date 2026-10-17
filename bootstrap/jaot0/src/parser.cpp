@@ -459,6 +459,27 @@ namespace JAOT {
             return expression;
         }
 
+        if (match(TokenKind::KwNull)) {
+            const Token &token = previous();
+            auto expression = std::make_unique<Expr>();
+            expression->kind = ExprKind::Null;
+            expression->location = {.line = token.line, .column = token.column};
+            return expression;
+        }
+
+        if (match(TokenKind::KwNew)) {
+            const Token &newToken = previous();
+            const Token &className = consume(TokenKind::Identifier, "expected class name after 'new'");
+            consume(TokenKind::LParen, "expected '(' after class name");
+            consume(TokenKind::RParen, "expected ')' after constructor arguments");
+
+            auto expression = std::make_unique<Expr>();
+            expression->kind = ExprKind::NewObject;
+            expression->className = className.text;
+            expression->location = {.line = newToken.line, .column = newToken.column};
+            return expression;
+        }
+
         if (match(TokenKind::Identifier)) {
             const Token identifier = previous();
             if (!match(TokenKind::LParen)) {
