@@ -14,6 +14,7 @@ JAOT0 source
 ```
 
 JAOT0 uses Java-like syntax, but it does not attempt to implement the Java language or JVM semantics.
+Control flow currently includes `if` and `while`; `while` is the only loop form.
 
 ## 2. Example Program
 
@@ -419,6 +420,7 @@ variable declaration
 assignment
 expression statement
 if statement
+while statement
 return statement
 ```
 
@@ -430,6 +432,12 @@ if (x > 0) {
 } else {
     printInt(0);
 }
+
+int count = 3;
+while (count > 0) {
+    printInt(count);
+    count = count - 1;
+}
 ```
 
 An `if` statement evaluates its parenthesized condition once. The condition
@@ -438,14 +446,26 @@ optional `else` block executes when it is `false`. If there is no `else` and
 the condition is false, execution continues after the `if`. Blocks may contain
 nested `if` statements.
 
+A `while` statement has the form `while (condition) { ... }`. Its condition
+must have type `boolean` and is evaluated before every iteration. The body
+executes when the condition is `true`; when it is `false`, execution continues
+after the loop. The body is always a block and may contain nested blocks,
+`if` statements, and `while` statements. `while` is the only supported loop
+form; `for`, `do-while`, `break`, and `continue` are not supported.
+
 Every variable read must be definitely initialized on every path reaching the
 read. After an `if`/`else`, a variable is definitely initialized only if it is
 initialized at the end of every branch that can continue. For an `if` without
 an `else`, assignments made only in the `then` block do not make a variable
 definitely initialized after the statement. Return analysis likewise accounts
 for both branches; both branches of an `if`/`else` must return for that
-statement to guarantee a return. Flow analysis treats both branches as possible,
-even when the condition is a literal.
+statement to guarantee a return. A `while` body is checked using the definite
+initialization state at loop entry; assignments made only in the body do not
+make a variable definitely initialized after the loop, because the body may
+execute zero times. A `while` statement does not guarantee a return, even when
+its condition is the literal `true`. Flow analysis treats both `if` branches as
+possible and treats a loop as possibly executing zero times, even when its
+condition is a literal.
 
 ## 17. Comments
 
@@ -527,6 +547,7 @@ false
 return
 if
 else
+while
 ```
 
 They cannot be used as identifiers.
@@ -600,6 +621,7 @@ statement
       | assignment-statement
       | expression-statement
       | if-statement
+      | while-statement
       | return-statement;
 
 variable-declaration
@@ -611,6 +633,9 @@ assignment-statement
 if-statement
     ::= "if" "(" expression ")" block
         ("else" block)? ;
+
+while-statement
+    ::= "while" "(" expression ")" block ;
 
 expression-statement
     ::= expression ";" ;
