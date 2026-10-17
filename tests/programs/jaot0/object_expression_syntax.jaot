@@ -1,9 +1,11 @@
 class Node {
+    int value;
+    boolean marked;
 }
 
 class Main {
     static void main() {
-        new Node();
-        null;
+        printBool(new Node() == null);
+        printBool(null == null);
     }
 }
