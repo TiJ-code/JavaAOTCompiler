@@ -301,6 +301,37 @@ namespace JAOT {
                         }
                         return;
                     }
+
+                    case StmtKind::While: {
+                        const IR::BlockId conditionId = newBlock();
+                        const IR::BlockId bodyId = newBlock();
+                        const IR::BlockId exitId = newBlock();
+
+                        IR::Terminator &entryJump = block(*currentBlock_).terminator;
+                        entryJump.kind = IR::TerminatorKind::Jump;
+                        entryJump.location = statement.location;
+                        entryJump.target = conditionId;
+
+                        currentBlock_ = conditionId;
+                        IR::Terminator &branch = block(*currentBlock_).terminator;
+                        branch.kind = IR::TerminatorKind::Branch;
+                        branch.location = statement.location;
+                        branch.condition = lowerExpression(*statement.condition);
+                        branch.trueTarget = bodyId;
+                        branch.falseTarget = exitId;
+
+                        currentBlock_ = bodyId;
+                        lowerScopedStatements(statement.body);
+                        if (currentBlock_) {
+                            IR::Terminator &backJump = block(*currentBlock_).terminator;
+                            backJump.kind = IR::TerminatorKind::Jump;
+                            backJump.location = statement.location;
+                            backJump.target = conditionId;
+                        }
+
+                        currentBlock_ = exitId;
+                        return;
+                    }
                 }
 
                 loweringError("unknown statement kind");

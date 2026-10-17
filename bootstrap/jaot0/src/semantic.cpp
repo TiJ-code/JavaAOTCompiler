@@ -361,6 +361,22 @@ namespace JAOT {
                     }
                     return flow;
                 }
+
+                case StmtKind::While: {
+                    const Type conditionType = checkExpression(
+                        *statement.condition, scopes, flow.initialized, methods);
+
+                    if (conditionType != Type::Boolean) {
+                        semanticError(
+                            statement.condition->location,
+                            "while condition must have type boolean");
+                    }
+
+                    (void)analyzeBlock(
+                        statement.body, flow, scopes, methods, method, nextSymbolId);
+
+                    return flow;
+                }
             }
 
             throw std::runtime_error("unknown statement kind");

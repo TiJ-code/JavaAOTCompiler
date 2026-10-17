@@ -18,6 +18,7 @@ namespace JAOT {
             {"return", TokenKind::KwReturn},
             {"if", TokenKind::KwIf},
             {"else", TokenKind::KwElse},
+            {"while", TokenKind::KwWhile},
         };
     }
 
@@ -61,6 +62,9 @@ namespace JAOT {
 
             case TokenKind::KwElse:
                 return "else";
+
+            case TokenKind::KwWhile:
+                return "while";
 
             case TokenKind::LBrace:
                 return "{";

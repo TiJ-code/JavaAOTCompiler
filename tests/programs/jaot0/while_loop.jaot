@@ -1,0 +1,10 @@
+class Main {
+    static void main() {
+        int count = 3;
+        while (count > 0) {
+            printInt(count);
+            count = count - 1;
+        }
+        printInt(count);
+    }
+}

@@ -18,6 +18,7 @@ namespace JAOT {
         KwTrue,
         KwFalse,
         KwReturn,
+        KwWhile,
 
         KwIf,
         KwElse,

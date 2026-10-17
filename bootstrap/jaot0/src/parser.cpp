@@ -185,6 +185,10 @@ namespace JAOT {
             return parseIf();
         }
 
+        if (match(TokenKind::KwWhile)) {
+            return parseWhile();
+        }
+
         if (check(TokenKind::LBrace)) {
             Stmt statement;
             statement.kind = StmtKind::Block;
@@ -278,6 +282,21 @@ namespace JAOT {
             statement.hasElse = true;
             statement.elseBody = parseBlock();
         }
+
+        return statement;
+    }
+
+    Stmt Parser::parseWhile() {
+        const auto &whileToken = previous();
+
+        Stmt statement;
+        statement.kind = StmtKind::While;
+        statement.location = { .line = whileToken.line, .column = whileToken.column };
+
+        consume(TokenKind::LParen, "expected '(' after 'while'");
+        statement.condition = parseExpression();
+        consume(TokenKind::RParen, "expected ')' after condition");
+        statement.body = parseBlock();
 
         return statement;
     }
