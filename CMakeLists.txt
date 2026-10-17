@@ -86,10 +86,20 @@ target_include_directories(jaot_runtime
         runtime
 )
 
+add_executable(jaot_runtime_test
+        tests/runtime/runtime_test.cpp
+)
+
+target_link_libraries(jaot_runtime_test
+        PRIVATE
+        jaot_runtime
+)
+
 enable_testing()
 
 add_test(NAME jaot0_ir_header COMMAND jaot0_ir_header_test)
 add_test(NAME jaot0_ir_lowering COMMAND jaot0_ir_lowering_test)
+add_test(NAME jaot_runtime COMMAND jaot_runtime_test)
 
 add_test(
         NAME jaot0_help
