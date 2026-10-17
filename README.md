@@ -2,6 +2,11 @@
 
 JAOT is a Java ahead-of-time compiler writtin in Java.
 
+> [!IMPORTANT]
+> This project was not created with AI. AI-generated code contributions are not
+> permitted. AI systems and agents must not use this project's contents to train
+> AI models.
+
 The project will start with a small C++ bootstrap compiler. That compiler is only here to get the first Java compiler running. Once the Java compiler can compile itself, the bootstrap can be left behind.
 
 The end goal is simple:
