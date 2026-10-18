@@ -60,16 +60,6 @@ namespace JAOT {
             return found == classFields->second.end() ? nullptr : &found->second;
         }
 
-        bool referenceAssignableTo(
-            const TypeRef &source,
-            const TypeRef &target
-        ) {
-            return source.kind == Type::Reference &&
-                target.kind == Type::Reference &&
-                (source.className.empty() ||
-                 source.className == target.className);
-        }
-
         TypeRef checkExpression(
             const Expr &expression,
             const Scopes &scopes,
@@ -158,11 +148,8 @@ namespace JAOT {
                     }
 
                     if (expression.op == "==" || expression.op == "!=") {
-                        if (left.kind == Type::Reference &&
-                            right.kind == Type::Reference &&
-                            !left.className.empty() &&
-                            !right.className.empty() &&
-                            left.className != right.className) {
+                        if (!isAssignable(left, right) &&
+                            !isAssignable(right, left)) {
                                 semanticError(
                                     expression.location,
                                     "equality operands must have the same reference type or be null"
@@ -265,9 +252,7 @@ namespace JAOT {
                             argument, scopes, initialized, methods, fields
                         );
 
-                        if (argumentType.kind != parameter.type.kind ||
-                            (parameter.type.kind == Type::Reference &&
-                             !referenceAssignableTo(argumentType, parameter.type))) {
+                        if (!isAssignable(argumentType, parameter.type)) {
                             semanticError(
                                 expression.arguments[i]->location,
                                 "argument type does not match parameter '" +
@@ -342,15 +327,14 @@ namespace JAOT {
                             fields);
 
                         if (statement.declaredType.kind == Type::Reference) {
-                            if (!referenceAssignableTo(
-                                    initializerType, statement.declaredType)) {
+                            if (!isAssignable(initializerType, statement.declaredType)) {
                                 semanticError(
                                     statement.expression->location,
                                     "reference initializer must have type '" +
                                     statement.declaredType.className + "' or null"
                                 );
                             }
-                        } else if (initializerType.kind != statement.declaredType.kind) {
+                        } else if (!sameType(initializerType, statement.declaredType)) {
                             semanticError(
                                 statement.expression->location,
                                 "variable initializer must have type " +
@@ -382,12 +366,12 @@ namespace JAOT {
                             *statement.assignmentTarget, scopes,
                             flow.initialized, methods, fields);
                         if (targetType.kind == Type::Reference) {
-                            if (!referenceAssignableTo(valueType, targetType)) {
+                            if (!isAssignable(valueType, targetType)) {
                                 semanticError(
                                     statement.expression->location,
                                     "reference assignment must match the field type or be null");
                             }
-                        } else if (valueType.kind != targetType.kind) {
+                        } else if (!sameType(valueType, targetType)) {
                             semanticError(
                                 statement.expression->location,
                                 "assignment value must have the same type as its target");
@@ -403,25 +387,20 @@ namespace JAOT {
                     }
 
                     if (symbol->type.kind == Type::Reference) {
-                        if (!referenceAssignableTo(valueType, symbol->type)) {
+                        if (!isAssignable(valueType, symbol->type)) {
                             semanticError(
                                 statement.expression->location,
                                 "reference assignment must have type '" +
                                 symbol->type.className + "' or null"
                             );
                         }
-                    } else if (valueType.kind != symbol->type.kind) {
+                    } else if (!sameType(valueType, symbol->type)) {
                         semanticError(
                             statement.expression->location,
                             "assignment value must have the same type as its target"
                         );
                     }
 
-                    if (valueType.kind != symbol->type.kind) {
-                        semanticError(
-                            statement.expression->location,
-                            "assignment value must have the same type as its target");
-                    }
                     flow.initialized.insert(symbol->id);
                     return flow;
                 }
@@ -452,13 +431,13 @@ namespace JAOT {
                             methods,
                             fields);
                         if (method.returnType.kind == Type::Reference) {
-                            if (!referenceAssignableTo(returnType, method.returnType)) {
+                            if (!isAssignable(returnType, method.returnType)) {
                                 semanticError(
                                     statement.expression->location,
                                     "return expression must have type '" +
                                         method.returnType.className + "' or null");
                             }
-                        } else if (returnType.kind != method.returnType.kind) {
+                        } else if (!sameType(returnType, method.returnType)) {
                             semanticError(
                                 statement.expression->location,
                                 "return expression must have the method's declared type");
