@@ -1,7 +1,6 @@
 #include "jaot/semantic.h"
 
 #include <algorithm>
-#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -61,63 +60,17 @@ namespace JAOT {
             return found == classFields->second.end() ? nullptr : &found->second;
         }
 
-        std::optional<std::string> referenceClassName(
-            const Expr &expression,
-            const Scopes &scopes,
-            const MethodTable &methods,
-            const FieldTable &fields
-        ) {
-            if (expression.kind == ExprKind::NewObject) {
-                return expression.className;
-            }
-
-            if (expression.kind == ExprKind::Variable) {
-                const Symbol *symbol = findSymbol(scopes, expression.name);
-                if (symbol != nullptr && symbol->type.kind == Type::Reference) {
-                    return symbol->type.className;
-                }
-            }
-
-            if (expression.kind == ExprKind::FieldAccess && expression.left) {
-                const auto receiverClass =
-                    referenceClassName(*expression.left, scopes, methods, fields);
-                if (receiverClass) {
-                    const FieldInfo *field =
-                        findField(fields, *receiverClass, expression.name);
-                    if (field != nullptr && field->type.kind == Type::Reference) {
-                        return field->type.className;
-                    }
-                }
-            }
-
-            if (expression.kind == ExprKind::Call) {
-                const auto method = methods.find(expression.callee);
-                if (method != methods.end() &&
-                    method->second->returnType.kind == Type::Reference) {
-                    return method->second->returnType.className;
-                }
-            }
-
-            return std::nullopt;
-        }
-
         bool referenceAssignableTo(
-            const Expr &expression,
-            const Scopes &scopes,
-            const MethodTable &methods,
-            const FieldTable &fields,
-            const std::string &targetClassName
+            const TypeRef &source,
+            const TypeRef &target
         ) {
-            if (expression.kind == ExprKind::Null) {
-                return true;
-            }
-
-            const auto sourceClassName =
-                referenceClassName(expression, scopes, methods, fields);
-            return sourceClassName.has_value() && *sourceClassName == targetClassName;
+            return source.kind == Type::Reference &&
+                target.kind == Type::Reference &&
+                (source.className.empty() ||
+                 source.className == target.className);
         }
 
-        Type checkExpression(
+        TypeRef checkExpression(
             const Expr &expression,
             const Scopes &scopes,
             const Initialized &initialized,
@@ -126,14 +79,16 @@ namespace JAOT {
         ) {
             switch (expression.kind) {
                 case ExprKind::Integer:
-                    return Type::Int;
+                    return TypeRef{.kind = Type::Int, .className = {}};
 
                 case ExprKind::Boolean:
-                    return Type::Boolean;
+                    return TypeRef{.kind = Type::Boolean, .className = {}};
 
                 case ExprKind::Null:
+                    return TypeRef{.kind = Type::Reference, .className = {}};
+
                 case ExprKind::NewObject:
-                    return Type::Reference;
+                    return TypeRef{.kind = Type::Reference, .className = expression.className};
 
                 case ExprKind::Variable: {
                     const Symbol *symbol = findSymbol(scopes, expression.name);
@@ -147,114 +102,104 @@ namespace JAOT {
                             expression.location,
                             "variable used before initialization: " + expression.name);
                     }
-                    return symbol->type.kind;
+                    return symbol->type;
                 }
 
                 case ExprKind::FieldAccess: {
                     if (!expression.left) {
                         semanticError(expression.location, "incomplete field access");
                     }
-                    const Type receiverType = checkExpression(
+                    const TypeRef receiverType = checkExpression(
                         *expression.left, scopes, initialized, methods, fields);
-                    if (receiverType != Type::Reference) {
+                    if (receiverType.kind != Type::Reference) {
                         semanticError(
                             expression.location,
                             "field access requires a reference receiver");
                     }
-                    const auto receiverClass =
-                        referenceClassName(
-                            *expression.left, scopes, methods, fields);
-                    if (!receiverClass) {
+                    if (receiverType.className.empty()) {
                         semanticError(
                             expression.location,
                             "field access requires a class-typed reference");
                     }
                     const FieldInfo *field =
-                        findField(fields, *receiverClass, expression.name);
+                        findField(fields, receiverType.className, expression.name);
                     if (field == nullptr) {
                         semanticError(
                             expression.location,
                             "unknown field: " + expression.name);
                     }
-                    return field->type.kind;
+                    return field->type;
                 }
 
                 case ExprKind::Binary: {
-                    const Type left = checkExpression(
+                    const TypeRef left = checkExpression(
                         *expression.left, scopes, initialized, methods, fields);
-                    const Type right = checkExpression(
+                    const TypeRef right = checkExpression(
                         *expression.right, scopes, initialized, methods, fields);
 
                     if (expression.op == "+" || expression.op == "-" ||
                         expression.op == "*" || expression.op == "/") {
-                        if (left != Type::Int || right != Type::Int) {
+                        if (left.kind != Type::Int || right.kind != Type::Int) {
                             semanticError(
                                 expression.location,
                                 "arithmetic operands must have type int");
                         }
-                        return Type::Int;
+                        return TypeRef{Type::Int, {}};
                     }
 
                     if (expression.op == "<" || expression.op == "<=" ||
                         expression.op == ">" || expression.op == ">=") {
-                        if (left != Type::Int || right != Type::Int) {
+                        if (left.kind != Type::Int || right.kind != Type::Int) {
                             semanticError(
                                 expression.location,
                                 "relational operands must have type int");
                         }
-                        return Type::Boolean;
+                        return TypeRef{Type::Boolean, {}};
                     }
 
                     if (expression.op == "==" || expression.op == "!=") {
-                        if (left == Type::Reference) {
-                            const auto leftClassName =
-                                referenceClassName(
-                                    *expression.left, scopes, methods, fields);
-                            const auto rightClassName =
-                                referenceClassName(
-                                    *expression.right, scopes, methods, fields);
-
-                            if (leftClassName.has_value() &&
-                                rightClassName.has_value() &&
-                                *leftClassName != *rightClassName) {
+                        if (left.kind == Type::Reference &&
+                            right.kind == Type::Reference &&
+                            !left.className.empty() &&
+                            !right.className.empty() &&
+                            left.className != right.className) {
                                 semanticError(
                                     expression.location,
                                     "equality operands must have the same reference type or be null"
                                 );
-                            }
                         }
 
-                        if (left != right ||
-                            (left != Type::Int &&
-                             left != Type::Boolean &&
-                             left != Type::Reference)) {
+                        if (left.kind != right.kind ||
+                            (left.kind != Type::Int &&
+                             left.kind != Type::Boolean &&
+                             left.kind != Type::Reference)) {
                             semanticError(
                                 expression.location,
                                 "equality operands must have the same value type");
                         }
-                        return Type::Boolean;
+                        return TypeRef{Type::Boolean, {}};
                     }
 
                     if (expression.op == "&&" || expression.op == "||") {
-                        if (left != Type::Boolean || right != Type::Boolean) {
+                        if (left.kind != Type::Boolean || right.kind != Type::Boolean) {
                             semanticError(expression.location, "logical operators require boolean operands");
                         }
 
-                        return Type::Boolean;
+                        return TypeRef{Type::Boolean, {}};
                     }
 
                     semanticError(expression.location, "unknown binary operator");
                 }
 
                 case ExprKind::Unary: {
-                    const Type operandType = checkExpression(
+                    const TypeRef operandType = checkExpression(
                         *expression.operand, scopes, initialized, methods, fields);
 
-                    if (operandType != Type::Boolean) {
+                    if (operandType.kind != Type::Boolean) {
                         semanticError(expression.location, "logical negation requires a boolean operand");
                     }
 
-                    return Type::Boolean;
+                    return TypeRef{Type::Boolean, {}};
                 }
 
                 case ExprKind::Call: {
@@ -269,12 +214,12 @@ namespace JAOT {
                                 scopes,
                                 initialized,
                                 methods,
-                                fields) != Type::Int) {
+                                fields).kind != Type::Int) {
                             semanticError(
                                 expression.arguments[0]->location,
                                 "printInt argument must have type int");
                         }
-                        return Type::Void;
+                        return TypeRef{Type::Void, {}};
                     }
 
                     if (expression.callee == "printBool") {
@@ -289,12 +234,12 @@ namespace JAOT {
                                 scopes,
                                 initialized,
                                 methods,
-                                fields) != Type::Boolean) {
+                                fields).kind != Type::Boolean) {
                             semanticError(
                                 expression.arguments[0]->location,
                                 "printBool arguments must have type boolean");
                         }
-                        return Type::Void;
+                        return TypeRef{Type::Void, {}};
                     }
 
                     const auto found = methods.find(expression.callee);
@@ -316,17 +261,13 @@ namespace JAOT {
                         const Expr &argument = *expression.arguments[i];
                         const Parameter &parameter = callee.parameters[i];
 
-                        const Type argumentType = checkExpression(
+                        const TypeRef argumentType = checkExpression(
                             argument, scopes, initialized, methods, fields
                         );
 
-                        const bool isReferenceAssignableTo = referenceAssignableTo(
-                            argument, scopes, methods, fields,
-                            parameter.type.className
-                        );
-
-                        if (argumentType != parameter.type.kind ||
-                            (parameter.type.kind == Type::Reference && !isReferenceAssignableTo)) {
+                        if (argumentType.kind != parameter.type.kind ||
+                            (parameter.type.kind == Type::Reference &&
+                             !referenceAssignableTo(argumentType, parameter.type))) {
                             semanticError(
                                 expression.arguments[i]->location,
                                 "argument type does not match parameter '" +
@@ -334,7 +275,7 @@ namespace JAOT {
                         }
                     }
 
-                    return callee.returnType.kind;
+                    return callee.returnType;
                 }
             }
 
@@ -393,7 +334,7 @@ namespace JAOT {
                     }
 
                     if (statement.expression) {
-                        const Type initializerType = checkExpression(
+                        const TypeRef initializerType = checkExpression(
                             *statement.expression,
                             scopes,
                             flow.initialized,
@@ -401,17 +342,15 @@ namespace JAOT {
                             fields);
 
                         if (statement.declaredType.kind == Type::Reference) {
-                            if (initializerType != Type::Reference ||
-                                !referenceAssignableTo(
-                                    *statement.expression, scopes, methods, fields,
-                                    statement.declaredType.className)) {
+                            if (!referenceAssignableTo(
+                                    initializerType, statement.declaredType)) {
                                 semanticError(
                                     statement.expression->location,
                                     "reference initializer must have type '" +
                                     statement.declaredType.className + "' or null"
                                 );
                             }
-                        } else if (initializerType != statement.declaredType.kind) {
+                        } else if (initializerType.kind != statement.declaredType.kind) {
                             semanticError(
                                 statement.expression->location,
                                 "variable initializer must have type " +
@@ -434,26 +373,21 @@ namespace JAOT {
                 }
 
                 case StmtKind::Assignment: {
-                    const Type valueType = checkExpression(
+                    const TypeRef valueType = checkExpression(
                         *statement.expression, scopes, flow.initialized,
                         methods, fields);
 
                     if (statement.assignmentTarget) {
-                        const Type targetType = checkExpression(
+                        const TypeRef targetType = checkExpression(
                             *statement.assignmentTarget, scopes,
                             flow.initialized, methods, fields);
-                        if (targetType == Type::Reference) {
-                            const auto targetClass = referenceClassName(
-                                *statement.assignmentTarget, scopes, methods, fields);
-                            if (!targetClass || valueType != Type::Reference ||
-                                !referenceAssignableTo(
-                                    *statement.expression, scopes, methods, fields,
-                                    *targetClass)) {
+                        if (targetType.kind == Type::Reference) {
+                            if (!referenceAssignableTo(valueType, targetType)) {
                                 semanticError(
                                     statement.expression->location,
                                     "reference assignment must match the field type or be null");
                             }
-                        } else if (valueType != targetType) {
+                        } else if (valueType.kind != targetType.kind) {
                             semanticError(
                                 statement.expression->location,
                                 "assignment value must have the same type as its target");
@@ -469,24 +403,21 @@ namespace JAOT {
                     }
 
                     if (symbol->type.kind == Type::Reference) {
-                        if (valueType != Type::Reference ||
-                            !referenceAssignableTo(
-                                *statement.expression, scopes, methods, fields,
-                                symbol->type.className)) {
+                        if (!referenceAssignableTo(valueType, symbol->type)) {
                             semanticError(
                                 statement.expression->location,
                                 "reference assignment must have type '" +
                                 symbol->type.className + "' or null"
                             );
                         }
-                    } else if (valueType != symbol->type.kind) {
+                    } else if (valueType.kind != symbol->type.kind) {
                         semanticError(
                             statement.expression->location,
                             "assignment value must have the same type as its target"
                         );
                     }
 
-                    if (valueType != symbol->type.kind) {
+                    if (valueType.kind != symbol->type.kind) {
                         semanticError(
                             statement.expression->location,
                             "assignment value must have the same type as its target");
@@ -514,26 +445,20 @@ namespace JAOT {
                                 statement.location,
                                 "non-void method must return a value");
                         }
-                        const Type returnType = checkExpression(
+                        const TypeRef returnType = checkExpression(
                             *statement.expression,
                             scopes,
                             flow.initialized,
                             methods,
                             fields);
                         if (method.returnType.kind == Type::Reference) {
-                            if (returnType != Type::Reference ||
-                                !referenceAssignableTo(
-                                    *statement.expression,
-                                    scopes,
-                                    methods,
-                                    fields,
-                                    method.returnType.className)) {
+                            if (!referenceAssignableTo(returnType, method.returnType)) {
                                 semanticError(
                                     statement.expression->location,
                                     "return expression must have type '" +
                                         method.returnType.className + "' or null");
                             }
-                        } else if (returnType != method.returnType.kind) {
+                        } else if (returnType.kind != method.returnType.kind) {
                             semanticError(
                                 statement.expression->location,
                                 "return expression must have the method's declared type");
@@ -548,10 +473,10 @@ namespace JAOT {
                         methods, fields, method, nextSymbolId);
 
                 case StmtKind::If: {
-                    const Type conditionType = checkExpression(
+                    const TypeRef conditionType = checkExpression(
                         *statement.condition, scopes, flow.initialized,
                         methods, fields);
-                    if (conditionType != Type::Boolean) {
+                    if (conditionType.kind != Type::Boolean) {
                         semanticError(
                             statement.condition->location,
                             "if condition must have type boolean");
@@ -587,11 +512,11 @@ namespace JAOT {
                 }
 
                 case StmtKind::While: {
-                    const Type conditionType = checkExpression(
+                    const TypeRef conditionType = checkExpression(
                         *statement.condition, scopes, flow.initialized,
                         methods, fields);
 
-                    if (conditionType != Type::Boolean) {
+                    if (conditionType.kind != Type::Boolean) {
                         semanticError(
                             statement.condition->location,
                             "while condition must have type boolean");
