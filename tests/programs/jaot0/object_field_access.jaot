@@ -1,0 +1,27 @@
+class Node {
+    int value;
+    boolean enabled;
+    Node next;
+}
+
+class Main {
+    static int initialValue() {
+        return 42;
+    }
+
+    static void main() {
+        Node first = new Node();
+        Node second = new Node();
+
+        first.value = initialValue();
+        first.enabled = true;
+        first.next = second;
+        first.next.value = 7;
+        second.next = null;
+
+        printInt(first.value);
+        printBool(first.enabled);
+        printInt(first.next.value);
+        printBool(first.next.next == null);
+    }
+}
