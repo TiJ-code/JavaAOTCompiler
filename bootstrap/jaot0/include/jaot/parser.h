@@ -166,7 +166,7 @@ namespace JAOT {
 
         std::unique_ptr<Expr> makeBinary(const Token &operatorToken, std::unique_ptr<Expr> left, std::unique_ptr<Expr> right);
 
-        void error(const std::string &message) const;
+        [[noreturn]] void error(const std::string &message) const;
 
         std::vector<Token> tokens_;
 

@@ -26,6 +26,8 @@ target_sources(jaot0
         bootstrap/jaot0/src/main.cpp
         bootstrap/jaot0/src/lexer.cpp
         bootstrap/jaot0/src/parser.cpp
+        bootstrap/jaot0/src/parser_statement.cpp
+        bootstrap/jaot0/src/parser_expression.cpp
         bootstrap/jaot0/src/codegen.cpp
         bootstrap/jaot0/src/semantic.cpp
 )
@@ -48,6 +50,8 @@ add_executable(jaot0_ir_lowering_test
         tests/ir_lowering_test.cpp
         bootstrap/jaot0/src/lexer.cpp
         bootstrap/jaot0/src/parser.cpp
+        bootstrap/jaot0/src/parser_statement.cpp
+        bootstrap/jaot0/src/parser_expression.cpp
         bootstrap/jaot0/src/ir_lowering.cpp
 )
 
