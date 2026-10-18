@@ -30,9 +30,13 @@ namespace JAOT {
             bool fallsThrough = true;
         };
 
-        MethodSignature signatureOf(const Method &method) {
+        MethodSignature signatureOf(
+            const std::string &ownerClass,
+            const Method &method
+        ) {
             MethodSignature signature;
             signature.name = method.name;
+            signature.ownerClass = ownerClass;
             signature.returnType = method.returnType;
             for (const Parameter &parameter : method.parameters) {
                 signature.parameterTypes.push_back(parameter.type);
@@ -247,6 +251,13 @@ namespace JAOT {
                     }
 
                     const MethodSignature &callee = found->second;
+                    if (!expression.calleeClass.empty() &&
+                        callee.ownerClass != expression.calleeClass) {
+                        semanticError(
+                            expression.location,
+                            "unknown method: " + expression.calleeClass +
+                            "." + expression.callee);
+                    }
                     if (expression.arguments.size() != callee.parameterTypes.size()) {
                         semanticError(
                             expression.location,
@@ -679,7 +690,8 @@ namespace JAOT {
                 }
 
                 if (!context.methods.emplace(
-                        method.name, signatureOf(method)).second) {
+                        method.name,
+                        signatureOf(declaration.name, method)).second) {
                     semanticError(
                         method.location,
                         "duplicate function: " + method.name

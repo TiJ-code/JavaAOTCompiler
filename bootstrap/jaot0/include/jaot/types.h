@@ -19,6 +19,7 @@ namespace JAOT {
 
     struct MethodSignature {
         std::string name;
+        std::string ownerClass;
         TypeRef returnType;
         std::vector<TypeRef> parameterTypes;
     };

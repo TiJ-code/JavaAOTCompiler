@@ -243,6 +243,7 @@ namespace JAOT {
                     case ExprKind::Call: {
                         lowered->kind = IR::ExprKind::Call;
                         lowered->callee = expression.callee;
+                        lowered->calleeClass = expression.calleeClass;
                         if (expression.callee == "printInt" ||
                             expression.callee == "printBool") {
                             lowered->type = Type::Void;
@@ -468,12 +469,17 @@ namespace JAOT {
             methodCount += declaration.methods.size();
 
             for (const Method &method : declaration.methods) {
+                MethodSignature signature{
+                    .name = method.name,
+                    .ownerClass = declaration.name,
+                    .returnType = method.returnType,
+                    .parameterTypes = {}};
+                for (const Parameter &parameter : method.parameters) {
+                    signature.parameterTypes.push_back(parameter.type);
+                }
                 if (!returnTypes.emplace(
                         method.name,
-                        MethodSignature{
-                            .name = method.name,
-                            .returnType = method.returnType,
-                            .parameterTypes = {}}).second) {
+                        std::move(signature)).second) {
                     loweringError("duplicate method: " + method.name);
                 }
             }

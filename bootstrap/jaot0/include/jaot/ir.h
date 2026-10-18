@@ -37,6 +37,7 @@ namespace JAOT::IR {
         std::string binaryOperator;
         std::string unaryOperator;
         std::string callee;
+        std::string calleeClass;
 
         std::vector<std::unique_ptr<Expr>> arguments;
         std::unique_ptr<Expr> left;

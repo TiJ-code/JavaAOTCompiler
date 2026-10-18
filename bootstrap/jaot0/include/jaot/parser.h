@@ -31,6 +31,7 @@ namespace JAOT {
         std::string name;
         std::string op;
         std::string callee;
+        std::string calleeClass;
         std::string className;
 
         std::vector<std::unique_ptr<Expr> > arguments;

@@ -202,6 +202,41 @@ namespace JAOT {
                 }
 
                 consume(TokenKind::RParen, "expected ')' after arguments");
+            } else if (match(TokenKind::Dot)) {
+                const Token method =
+                    consume(TokenKind::Identifier, "expected method name after class name");
+
+                if (match(TokenKind::LParen)) {
+                    expression = std::make_unique<Expr>();
+                    expression->kind = ExprKind::Call;
+                    expression->callee = method.text;
+                    expression->calleeClass = identifier.text;
+                    expression->location = {
+                        identifier.line, identifier.column};
+
+                    if (!check(TokenKind::RParen)) {
+                        while (true) {
+                            expression->arguments.push_back(parseExpression());
+                            if (!match(TokenKind::Comma)) {
+                                break;
+                            }
+                        }
+                    }
+
+                    consume(TokenKind::RParen, "expected ')' after arguments");
+                } else {
+                    auto receiver = std::make_unique<Expr>();
+                    receiver->kind = ExprKind::Variable;
+                    receiver->name = identifier.text;
+                    receiver->location = {
+                        identifier.line, identifier.column};
+
+                    expression = std::make_unique<Expr>();
+                    expression->kind = ExprKind::FieldAccess;
+                    expression->name = method.text;
+                    expression->location = {method.line, method.column};
+                    expression->left = std::move(receiver);
+                }
             } else {
                 expression = std::make_unique<Expr>();
                 expression->kind = ExprKind::Variable;
