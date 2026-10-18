@@ -99,6 +99,12 @@ namespace JAOT {
         std::vector<ClassDeclaration> classes;
     };
 
+    struct ParsedType {
+        Type type;
+        std::string className;
+        SourceLocation location {};
+    };
+
     class Parser {
     public:
         explicit Parser(std::vector<Token> tokens);
@@ -116,7 +122,7 @@ namespace JAOT {
 
         const Token &consume(TokenKind kind, const char *message);
 
-        Type parseValueType();
+        ParsedType parseType(bool allowVoid);
 
         ClassDeclaration parseClass();
 

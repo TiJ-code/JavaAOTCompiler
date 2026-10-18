@@ -65,14 +65,50 @@ namespace JAOT {
                                  ":" + std::to_string(token.column) + ": " + message);
     }
 
-    Type Parser::parseValueType() {
+    ParsedType Parser::parseType(const bool allowVoid) {
+        const Token &token = current();
+
         if (match(TokenKind::KwInt)) {
-            return Type::Int;
+            return ParsedType {
+                .type = Type::Int,
+                .className = {},
+                .location = {.line = token.line, .column = token.column}
+            };
         }
+
         if (match(TokenKind::KwBoolean)) {
-            return Type::Boolean;
+            return ParsedType {
+                .type = Type::Boolean,
+                .className = {},
+                .location = {.line = token.line, .column = token.column}
+            };
         }
-        error("expected 'int' or 'boolean'");
+
+        if (check(TokenKind::KwVoid)) {
+            if (!allowVoid) {
+                error("'void' is only valid as a method return type");
+            }
+
+            match(TokenKind::KwVoid);
+
+            return ParsedType {
+                .type = Type::Void,
+                .className = {},
+                .location = {.line = token.line, .column = token.column}
+            };
+        }
+
+        if (check(TokenKind::Identifier)) {
+            const Token &classToken = consume(TokenKind::Identifier, "expected type");
+
+            return ParsedType {
+                .type = Type::Reference,
+                .className = classToken.text,
+                .location = {.line = classToken.line, .column = classToken.column}
+            };
+        }
+
+        error("expected type");
     }
 
     Program Parser::parse() {
@@ -116,20 +152,13 @@ namespace JAOT {
     }
 
     Field Parser::parseField() {
-        std::string typeName;
-        SourceLocation typeLocation {};
-
-        if (match(TokenKind::KwInt)) {
-            typeName = "int";
-            typeLocation = {.line = previous().line, .column = previous().column};
-        } else if (match(TokenKind::KwBoolean)) {
-            typeName = "boolean";
-            typeLocation = {.line = previous().line, .column = previous().column};
-        } else {
-            const Token &type = consume(TokenKind::Identifier, "expected field type");
-            typeName = type.text;
-            typeLocation = {.line = previous().line, .column = previous().column};
-        }
+        const ParsedType type = parseType(false);
+        const std::string typeName =
+            type.type == Type::Reference
+            ? type.className
+            : type.type == Type::Int
+                ? "int"
+                : "boolean";
 
         const Token &name = consume(TokenKind::Identifier, "expected field name");
         consume(TokenKind::Semicolon, "expected ';' after field declaration");
@@ -137,70 +166,37 @@ namespace JAOT {
         return {
             .typeName = typeName,
             .name = name.text,
-            .location = typeLocation
+            .location = type.location
         };
     }
 
     Method Parser::parseMethod() {
         consume(TokenKind::KwStatic, "expected 'static'");
 
-        const auto &returnTypeToken = current();
-        std::string returnClassName;
-        Type returnType;
-
-        if (match(TokenKind::KwVoid)) {
-            returnType = Type::Void;
-        } else if (match(TokenKind::KwInt)) {
-            returnType = Type::Int;
-        } else if (match(TokenKind::KwBoolean)) {
-            returnType = Type::Boolean;
-        } else if (check(TokenKind::Identifier)) {
-            const Token &classType = consume(TokenKind::Identifier, "expected return type");
-            returnClassName = classType.text;
-            returnType = Type::Reference;
-        } else {
-            error("unexpected method return type");
-        }
+        const ParsedType returnType = parseType(true);
 
         const auto &name = consume(TokenKind::Identifier, "expected method name");
 
         consume(TokenKind::LParen, "expected '(' after method name");
 
         Method method;
-        method.returnType = returnType;
-        method.returnClassName = returnClassName;
+        method.returnType = returnType.type;
+        method.returnClassName = returnType.className;
         method.name = name.text;
-        method.location = { .line = returnTypeToken.line, .column = returnTypeToken.column };
+        method.location = returnType.location;
 
         if (!check(TokenKind::RParen)) {
             while (true) {
-                Type parameterType;
-                std::string parameterClassName;
-
-                if (match(TokenKind::KwInt)) {
-                    parameterType = Type::Int;
-                } else if (match(TokenKind::KwBoolean)) {
-                    parameterType = Type::Boolean;
-                } else if (check(TokenKind::Identifier)) {
-                    const Token &classType =
-                        consume(TokenKind::Identifier, "expected parameter type");
-                    parameterType = Type::Reference;
-                    parameterClassName = classType.text;
-                } else {
-                    error("unexpected parameter type");
-                }
+                const ParsedType parameterType = parseType(false);
 
                 const auto &parameter =
                         consume(TokenKind::Identifier, "expected parameter name");
 
                 method.parameters.push_back({
-                    .type = parameterType,
-                    .className = parameterClassName,
+                    .type = parameterType.type,
+                    .className = parameterType.className,
                     .name = parameter.text,
-                    .location = {
-                        .line = parameter.line,
-                        .column = parameter.column
-                    }
+                    .location = parameterType.location
                 });
 
                 if (!match(TokenKind::Comma)) {
@@ -236,12 +232,9 @@ namespace JAOT {
     }
 
     Stmt Parser::parseStatement() {
-        if (match(TokenKind::KwInt)) {
-            return parseVariableDeclaration(Type::Int);
-        }
-
-        if (match(TokenKind::KwBoolean)) {
-            return parseVariableDeclaration(Type::Boolean);
+        if (check(TokenKind::KwInt) || check(TokenKind::KwBoolean)) {
+            const ParsedType type = parseType(false);
+            return parseVariableDeclaration(type.type, type.className);
         }
 
         if (match(TokenKind::KwReturn)) {
@@ -282,9 +275,8 @@ namespace JAOT {
         if (check(TokenKind::Identifier) &&
             index_ + 1 < tokens_.size() &&
             tokens_[index_ + 1].kind == TokenKind::Identifier) {
-            const Token typeName = current();
-            ++index_;
-            return parseVariableDeclaration(Type::Reference, typeName.text);
+            const ParsedType type = parseType(false);
+            return parseVariableDeclaration(type.type, type.className);
         }
 
         Stmt statement;
