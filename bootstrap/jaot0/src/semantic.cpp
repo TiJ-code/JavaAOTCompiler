@@ -659,23 +659,35 @@ namespace JAOT {
         }
     }
 
-    void SematicAnalyzer::analyze(const Program &program) const {
+    struct SematicAnalyzer::AnalysisContext {
         std::unordered_set<std::string> classNames;
-
         FieldTable fields;
+        MethodTable methods;
+        const Method *mainMethod = nullptr;
+    };
+
+    void SematicAnalyzer::collectClassNames(
+        const Program &program,
+        AnalysisContext &context
+    ) {
         for (const ClassDeclaration &declaration : program.classes) {
-            if (!classNames.insert(declaration.name).second) {
+            if (!context.classNames.insert(declaration.name).second) {
                 semanticError(
                     declaration.location,
                     "duplicate class: " + declaration.name
                 );
             }
         }
+    }
 
+    void SematicAnalyzer::validateMethodTypes(
+        const Program &program,
+        const AnalysisContext &context
+    ) {
         for (const ClassDeclaration &declaration : program.classes) {
             for (const Method &method : declaration.methods) {
                 if (method.returnType.kind == Type::Reference &&
-                    !classNames.contains(method.returnType.className)) {
+                    !context.classNames.contains(method.returnType.className)) {
                     semanticError(
                         method.location,
                         "unknown return type: " + method.returnType.className
@@ -684,7 +696,7 @@ namespace JAOT {
 
                 for (const Parameter &parameter : method.parameters) {
                     if (parameter.type.kind == Type::Reference &&
-                        !classNames.contains(parameter.type.className)) {
+                            !context.classNames.contains(parameter.type.className)) {
                         semanticError(
                             parameter.location,
                             "unknown parameter type: " + parameter.type.className
@@ -693,21 +705,26 @@ namespace JAOT {
                 }
             }
         }
+    }
 
-        const ClassDeclaration *mainClass = nullptr;
+    void SematicAnalyzer::validateRequiredMainClass(
+        const Program &program
+    ) {
         for (const ClassDeclaration &declaration : program.classes) {
             if (declaration.name == "Main") {
-                mainClass = &declaration;
-                break;
+                return;
             }
         }
 
-        if (mainClass == nullptr) {
-            throw std::runtime_error(
-                "semantic error: missing required class 'Main'"
-            );
-        }
+        throw std::runtime_error(
+            "semantic error: missing required class 'Main'"
+        );
+    }
 
+    void SematicAnalyzer::collectFields(
+        const Program &program,
+        AnalysisContext &context
+    ) {
         for (const ClassDeclaration &declaration : program.classes) {
             std::unordered_set<std::string> fieldNames;
 
@@ -720,22 +737,24 @@ namespace JAOT {
                 }
 
                 if (field.type.kind == Type::Reference &&
-                    !classNames.contains(field.type.className)) {
+                    !context.classNames.contains(field.type.className)) {
                     semanticError(
                         field.location,
                         "unknown field: " + field.type.className
                     );
                 }
 
-                fields[declaration.name].emplace(
+                context.fields[declaration.name].emplace(
                     field.name,
                     FieldInfo{field.type});
             }
         }
+    }
 
-        MethodTable methods;
-        const Method *mainMethod = nullptr;
-
+    void SematicAnalyzer::collectMethods(
+        const Program &program,
+        AnalysisContext &context
+    ) {
         for (const ClassDeclaration &declaration : program.classes) {
             for (const Method &method : declaration.methods) {
                 if (method.name == "printInt" || method.name == "printBool") {
@@ -745,7 +764,7 @@ namespace JAOT {
                     );
                 }
 
-                if (!methods.emplace(method.name, &method).second) {
+                if (!context.methods.emplace(method.name, &method).second) {
                     semanticError(
                         method.location,
                         "duplicate function: " + method.name
@@ -753,29 +772,50 @@ namespace JAOT {
                 }
 
                 if (declaration.name == "Main" && method.name == "main") {
-                    mainMethod = &method;
+                    context.mainMethod = &method;
                 }
             }
         }
+    }
 
-        if (mainMethod == nullptr) {
+    void SematicAnalyzer::validateEntryPoint(
+        const AnalysisContext &context
+    ) {
+        if (context.mainMethod == nullptr) {
             throw std::runtime_error(
                 "semantic error: missing required entry point 'Main.main' (expected static void main())"
             );
         }
 
-        if (mainMethod->returnType.kind != Type::Void ||
-            !mainMethod->parameters.empty()) {
+        if (context.mainMethod->returnType.kind != Type::Void ||
+            !context.mainMethod->parameters.empty()) {
             semanticError(
-                mainMethod->location,
+                context.mainMethod->location,
                 "entry point 'Main.main' must have signature 'static void main()'"
             );
         }
+    }
 
+    void SematicAnalyzer::analyzeMethodBodies(
+        const Program &program,
+        const AnalysisContext &context
+    ) {
         for (const ClassDeclaration &declaration : program.classes) {
             for (const Method &method : declaration.methods) {
-                checkMethod(method, methods, fields);
+                checkMethod(method, context.methods, context.fields);
             }
         }
+    }
+
+    void SematicAnalyzer::analyze(const Program &program) {
+        AnalysisContext context;
+
+        collectClassNames(program, context);
+        validateMethodTypes(program, context);
+        validateRequiredMainClass(program);
+        collectFields(program, context);
+        collectMethods(program, context);
+        validateEntryPoint(context);
+        analyzeMethodBodies(program, context);
     }
 }
