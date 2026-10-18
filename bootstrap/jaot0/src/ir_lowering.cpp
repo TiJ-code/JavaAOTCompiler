@@ -13,11 +13,6 @@
 
 namespace JAOT {
     namespace {
-        struct MethodSignature {
-            Type returnType;
-            std::string returnClassName;
-        };
-
         using MethodReturnTypes = std::unordered_map<std::string, MethodSignature>;
         using ClassFields = std::unordered_map<std::string, std::vector<IR::Field>>;
 
@@ -35,9 +30,11 @@ namespace JAOT {
             }
 
             IR::Method lower(const Method &method) {
-                result_.name = method.name;
-                result_.returnType = method.returnType.kind;
-                result_.returnClassName = method.returnType.className;
+                result_.signature.name = method.name;
+                result_.signature.returnType = method.returnType;
+                for (const Parameter &parameter : method.parameters) {
+                    result_.signature.parameterTypes.push_back(parameter.type);
+                }
                 scopes_.emplace_back();
 
                 for (const Parameter &parameter : method.parameters) {
@@ -74,7 +71,9 @@ namespace JAOT {
             IR::BlockId newBlock() {
                 if (result_.blocks.size() >
                     std::numeric_limits<IR::BlockId>::max()) {
-                    loweringError("too many basic blocks in method " + result_.name);
+                    loweringError(
+                        "too many basic blocks in method " +
+                        result_.signature.name);
                 }
                 const auto id =
                     static_cast<IR::BlockId>(result_.blocks.size());
@@ -102,7 +101,9 @@ namespace JAOT {
                 }
                 if (result_.locals.size() >
                     std::numeric_limits<IR::LocalId>::max()) {
-                    loweringError("too many locals in method " + result_.name);
+                    loweringError(
+                        "too many locals in method " +
+                        result_.signature.name);
                 }
 
                 const auto id =
@@ -118,7 +119,7 @@ namespace JAOT {
                 return id;
             }
 
-            IR::LocalId findLocal(const std::string &name) const {
+            [[nodiscard]] IR::LocalId findLocal(const std::string &name) const {
                 for (auto scope = scopes_.rbegin(); scope != scopes_.rend(); ++scope) {
                     const auto found = scope->find(name);
                     if (found != scope->end()) {
@@ -128,14 +129,14 @@ namespace JAOT {
                 loweringError("unresolved local: " + name);
             }
 
-            Type localType(IR::LocalId id) const {
+            [[nodiscard]] Type localType(IR::LocalId id) const {
                 if (id >= result_.locals.size()) {
                     loweringError("invalid local id");
                 }
                 return result_.locals[id].type;
             }
 
-            const std::string &localClassName(IR::LocalId id) const {
+            [[nodiscard]] const std::string &localClassName(IR::LocalId id) const {
                 if (id >= result_.locals.size()) {
                     loweringError("invalid local id");
                 }
@@ -251,8 +252,8 @@ namespace JAOT {
                                 loweringError(
                                     "unresolved function: " + expression.callee);
                             }
-                            lowered->type = found->second.returnType;
-                            lowered->className = found->second.returnClassName;
+                                    lowered->type = found->second.returnType.kind;
+                                    lowered->className = found->second.returnType.className;
                         }
                         for (const auto &argument : expression.arguments) {
                             lowered->arguments.push_back(
@@ -470,8 +471,9 @@ namespace JAOT {
                 if (!returnTypes.emplace(
                         method.name,
                         MethodSignature{
-                            method.returnType.kind,
-                            method.returnType.className}).second) {
+                            .name = method.name,
+                            .returnType = method.returnType,
+                            .parameterTypes = {}}).second) {
                     loweringError("duplicate method: " + method.name);
                 }
             }

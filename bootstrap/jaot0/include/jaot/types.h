@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <string>
+#include <vector>
 
 namespace JAOT {
     enum class Type {
@@ -14,6 +15,12 @@ namespace JAOT {
     struct TypeRef {
         Type kind;
         std::string className;
+    };
+
+    struct MethodSignature {
+        std::string name;
+        TypeRef returnType;
+        std::vector<TypeRef> parameterTypes;
     };
 
     inline bool sameType(const TypeRef &left, const TypeRef &right) {

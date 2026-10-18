@@ -113,9 +113,9 @@ int main() {
             "expected two lowered methods");
 
         const JAOT::IR::Method &add = ir.methods[0];
-        require(add.name == "add",
+        require(add.signature.name == "add",
             "expected 'add' method first");
-        require(add.returnType == JAOT::Type::Int,
+        require(add.signature.returnType.kind == JAOT::Type::Int,
             "'add' should return 'int'");
         require(add.parameters == std::vector<JAOT::IR::LocalId>{0, 1},
             "'add' parameters should map to local IDs 0 and 1");
@@ -153,7 +153,7 @@ int main() {
             "left operand should refer to parameter 'b'");
 
         const JAOT::IR::Method &main = ir.methods[1];
-        require(main.name == "main",
+        require(main.signature.name == "main",
             "expected 'main' method second");
         require(main.locals.size() == 1 &&
             main.locals[0].name == "result",

@@ -7,7 +7,7 @@
 
 namespace JAOT {
     namespace {
-        using MethodTable = std::unordered_map<std::string, const Method *>;
+        using MethodTable = std::unordered_map<std::string, MethodSignature>;
         using Initialized = std::unordered_set<std::size_t>;
 
         struct FieldInfo {
@@ -29,6 +29,16 @@ namespace JAOT {
             Initialized initialized;
             bool fallsThrough = true;
         };
+
+        MethodSignature signatureOf(const Method &method) {
+            MethodSignature signature;
+            signature.name = method.name;
+            signature.returnType = method.returnType;
+            for (const Parameter &parameter : method.parameters) {
+                signature.parameterTypes.push_back(parameter.type);
+            }
+            return signature;
+        }
 
         [[noreturn]] void semanticError(
             SourceLocation location,
@@ -236,27 +246,27 @@ namespace JAOT {
                             "unknown function: " + expression.callee);
                     }
 
-                    const Method &callee = *found->second;
-                    if (expression.arguments.size() != callee.parameters.size()) {
+                    const MethodSignature &callee = found->second;
+                    if (expression.arguments.size() != callee.parameterTypes.size()) {
                         semanticError(
                             expression.location,
                             "function " + expression.callee + " expects " +
-                            std::to_string(callee.parameters.size()) + " arguments");
+                            std::to_string(callee.parameterTypes.size()) + " arguments");
                     }
 
                     for (std::size_t i = 0; i < expression.arguments.size(); ++i) {
                         const Expr &argument = *expression.arguments[i];
-                        const Parameter &parameter = callee.parameters[i];
+                        const TypeRef &parameter = callee.parameterTypes[i];
 
                         const TypeRef argumentType = checkExpression(
                             argument, scopes, initialized, methods, fields
                         );
 
-                        if (!isAssignable(argumentType, parameter.type)) {
+                        if (!isAssignable(argumentType, parameter)) {
                             semanticError(
                                 expression.arguments[i]->location,
                                 "argument type does not match parameter '" +
-                                callee.parameters[i].name + "'");
+                                std::to_string(i));
                         }
                     }
 
@@ -668,7 +678,8 @@ namespace JAOT {
                     );
                 }
 
-                if (!context.methods.emplace(method.name, &method).second) {
+                if (!context.methods.emplace(
+                        method.name, signatureOf(method)).second) {
                     semanticError(
                         method.location,
                         "duplicate function: " + method.name

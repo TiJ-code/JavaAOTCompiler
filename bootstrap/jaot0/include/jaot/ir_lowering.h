@@ -7,6 +7,6 @@ namespace JAOT {
 
     class IrLowerer {
     public:
-        IR::Program lower(const Program &program) const;
+        [[nodiscard]] IR::Program lower(const Program &program) const;
     };
 }
