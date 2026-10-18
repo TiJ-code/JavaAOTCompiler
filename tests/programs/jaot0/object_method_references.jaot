@@ -1,6 +1,12 @@
 class Node {
 }
 
+class Helper {
+    static boolean same(Node left, Node right) {
+        return left == right;
+    }
+}
+
 class Main {
     static Node identity(Node value) {
         return value;
@@ -16,10 +22,11 @@ class Main {
 
     static void main() {
         Node original = new Node();
-        Node copy = identity(original);
+        Node copy = Main.identity(original);
 
         printBool(copy == original);
-        showNull(empty());
-        showNull(null);
+        printBool(Helper.same(original, copy));
+        Main.showNull(Main.empty());
+        Main.showNull(null);
     }
 }
