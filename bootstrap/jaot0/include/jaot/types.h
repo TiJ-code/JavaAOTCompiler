@@ -24,6 +24,13 @@ namespace JAOT {
         std::vector<TypeRef> parameterTypes;
     };
 
+    inline std::string methodSymbol(const MethodSignature &signature) {
+        if (signature.ownerClass == "Main" && signature.name == "main") {
+            return "main";
+        }
+        return signature.ownerClass + "_" + signature.name;
+    }
+
     inline bool sameType(const TypeRef &left, const TypeRef &right) {
         return left.kind == right.kind &&
             (left.kind != Type::Reference ||

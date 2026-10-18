@@ -44,9 +44,23 @@ namespace JAOT {
             return signature;
         }
 
+        const MethodSignature *findMethod(
+            const MethodTable &methods,
+            const std::string &currentClass,
+            const Expr &expression
+        ) {
+            const std::string &owner =
+                expression.calleeClass.empty()
+                    ? currentClass
+                    : expression.calleeClass;
+            const auto found = methods.find(owner + "." + expression.callee);
+            return found == methods.end() ? nullptr : &found->second;
+        }
+
         [[noreturn]] void semanticError(
-            SourceLocation location,
-            const std::string &message) {
+            const SourceLocation location,
+            const std::string &message
+        ) {
             throw std::runtime_error(
                 "semantic error at " + std::to_string(location.line) + ":" +
                 std::to_string(location.column) + ": " + message);
@@ -79,7 +93,8 @@ namespace JAOT {
             const Scopes &scopes,
             const Initialized &initialized,
             const MethodTable &methods,
-            const FieldTable &fields
+            const FieldTable &fields,
+            const std::string &currentClass
         ) {
             switch (expression.kind) {
                 case ExprKind::Integer:
@@ -114,7 +129,8 @@ namespace JAOT {
                         semanticError(expression.location, "incomplete field access");
                     }
                     const TypeRef receiverType = checkExpression(
-                        *expression.left, scopes, initialized, methods, fields);
+                        *expression.left, scopes, initialized, methods, fields,
+                        currentClass);
                     if (receiverType.kind != Type::Reference) {
                         semanticError(
                             expression.location,
@@ -137,9 +153,11 @@ namespace JAOT {
 
                 case ExprKind::Binary: {
                     const TypeRef left = checkExpression(
-                        *expression.left, scopes, initialized, methods, fields);
+                        *expression.left, scopes, initialized, methods, fields,
+                        currentClass);
                     const TypeRef right = checkExpression(
-                        *expression.right, scopes, initialized, methods, fields);
+                        *expression.right, scopes, initialized, methods, fields,
+                        currentClass);
 
                     if (expression.op == "+" || expression.op == "-" ||
                         expression.op == "*" || expression.op == "/") {
@@ -201,7 +219,8 @@ namespace JAOT {
 
                 case ExprKind::Unary: {
                     const TypeRef operandType = checkExpression(
-                        *expression.operand, scopes, initialized, methods, fields);
+                        *expression.operand, scopes, initialized, methods, fields,
+                        currentClass);
 
                     if (operandType.kind != Type::Boolean) {
                         semanticError(
@@ -225,7 +244,8 @@ namespace JAOT {
                                 scopes,
                                 initialized,
                                 methods,
-                                fields);
+                                fields,
+                                currentClass);
                         if (argumentType.kind != Type::Int) {
                             semanticError(
                                 expression.arguments[0]->location,
@@ -247,7 +267,8 @@ namespace JAOT {
                                 scopes,
                                 initialized,
                                 methods,
-                                fields);
+                                fields,
+                                currentClass);
                         if (argumentType.kind != Type::Boolean) {
                             semanticError(
                                 expression.arguments[0]->location,
@@ -257,34 +278,34 @@ namespace JAOT {
                         return TypeRef{Type::Void, {}};
                     }
 
-                    const auto found = methods.find(expression.callee);
-                    if (found == methods.end()) {
+                    const MethodSignature *callee =
+                        findMethod(methods, currentClass, expression);
+                    if (callee == nullptr) {
                         semanticError(
                             expression.location,
-                            "unknown function: " + expression.callee);
+                            "unknown function: " +
+                            (expression.calleeClass.empty()
+                                ? expression.callee
+                                : expression.calleeClass + "." +
+                                  expression.callee));
                     }
 
-                    const MethodSignature &callee = found->second;
-                    if (!expression.calleeClass.empty() &&
-                        callee.ownerClass != expression.calleeClass) {
-                        semanticError(
-                            expression.location,
-                            "unknown method: " + expression.calleeClass +
-                            "." + expression.callee);
-                    }
-                    if (expression.arguments.size() != callee.parameterTypes.size()) {
+                    if (expression.arguments.size() !=
+                        callee->parameterTypes.size()) {
                         semanticError(
                             expression.location,
                             "function " + expression.callee + " expects " +
-                            std::to_string(callee.parameterTypes.size()) + " arguments");
+                            std::to_string(callee->parameterTypes.size()) +
+                            " arguments");
                     }
 
                     for (std::size_t i = 0; i < expression.arguments.size(); ++i) {
                         const Expr &argument = *expression.arguments[i];
-                        const TypeRef &parameter = callee.parameterTypes[i];
+                        const TypeRef &parameter = callee->parameterTypes[i];
 
                         const TypeRef argumentType = checkExpression(
-                            argument, scopes, initialized, methods, fields
+                            argument, scopes, initialized, methods, fields,
+                            currentClass
                         );
 
                         if (!isAssignable(argumentType, parameter)) {
@@ -297,7 +318,7 @@ namespace JAOT {
                         }
                     }
 
-                    return callee.returnType;
+                    return callee->returnType;
                 }
             }
 
@@ -311,7 +332,8 @@ namespace JAOT {
             const MethodTable &methods,
             const FieldTable &fields,
             const Method &method,
-            std::size_t &nextSymbolId);
+            std::size_t &nextSymbolId,
+            const std::string &currentClass);
 
         Flow analyzeBlock(
             const std::vector<Stmt> &statements,
@@ -320,11 +342,12 @@ namespace JAOT {
             const MethodTable &methods,
             const FieldTable &fields,
             const Method &method,
-            std::size_t &nextSymbolId) {
+            std::size_t &nextSymbolId,
+            const std::string &currentClass) {
             scopes.emplace_back();
             flow = analyzeStatements(
                 statements, std::move(flow), scopes, methods, fields,
-                method, nextSymbolId);
+                method, nextSymbolId, currentClass);
 
             for (const auto &[name, symbol] : scopes.back()) {
                 (void)name;
@@ -341,7 +364,8 @@ namespace JAOT {
             const MethodTable &methods,
             const FieldTable &fields,
             const Method &method,
-            std::size_t &nextSymbolId
+            std::size_t &nextSymbolId,
+            const std::string &currentClass
         ) {
             if (!flow.fallsThrough) {
                 return flow;
@@ -361,7 +385,8 @@ namespace JAOT {
                             scopes,
                             flow.initialized,
                             methods,
-                            fields);
+                            fields,
+                            currentClass);
 
                         if (statement.declaredType.kind == Type::Reference) {
                             if (!isAssignable(initializerType, statement.declaredType)) {
@@ -399,12 +424,12 @@ namespace JAOT {
                 case StmtKind::Assignment: {
                     const TypeRef valueType = checkExpression(
                         *statement.expression, scopes, flow.initialized,
-                        methods, fields);
+                        methods, fields, currentClass);
 
                     if (statement.assignmentTarget) {
                         const TypeRef targetType = checkExpression(
                             *statement.assignmentTarget, scopes,
-                            flow.initialized, methods, fields);
+                            flow.initialized, methods, fields, currentClass);
                         if (targetType.kind == Type::Reference) {
                             if (!isAssignable(valueType, targetType)) {
                                 semanticError(
@@ -455,7 +480,7 @@ namespace JAOT {
                 case StmtKind::Expression:
                     checkExpression(
                         *statement.expression, scopes, flow.initialized,
-                        methods, fields);
+                        methods, fields, currentClass);
                     return flow;
 
                 case StmtKind::Return:
@@ -476,7 +501,8 @@ namespace JAOT {
                             scopes,
                             flow.initialized,
                             methods,
-                            fields);
+                            fields,
+                            currentClass);
                         if (method.returnType.kind == Type::Reference) {
                             if (!isAssignable(returnType, method.returnType)) {
                                 semanticError(
@@ -500,12 +526,12 @@ namespace JAOT {
                 case StmtKind::Block:
                     return analyzeBlock(
                         statement.body, std::move(flow), scopes,
-                        methods, fields, method, nextSymbolId);
+                        methods, fields, method, nextSymbolId, currentClass);
 
                 case StmtKind::If: {
                     const TypeRef conditionType = checkExpression(
                         *statement.condition, scopes, flow.initialized,
-                        methods, fields);
+                        methods, fields, currentClass);
                     if (conditionType.kind != Type::Boolean) {
                         semanticError(
                             statement.condition->location,
@@ -515,12 +541,13 @@ namespace JAOT {
 
                     Flow thenFlow = analyzeBlock(
                         statement.body, flow, scopes, methods, fields,
-                        method, nextSymbolId);
+                        method, nextSymbolId, currentClass);
                     Flow elseFlow = flow;
                     if (statement.hasElse) {
                         elseFlow = analyzeBlock(
                             statement.elseBody, std::move(elseFlow), scopes,
-                            methods, fields, method, nextSymbolId);
+                            methods, fields, method, nextSymbolId,
+                            currentClass);
                     }
 
                     if (thenFlow.fallsThrough && elseFlow.fallsThrough) {
@@ -545,7 +572,7 @@ namespace JAOT {
                 case StmtKind::While: {
                     const TypeRef conditionType = checkExpression(
                         *statement.condition, scopes, flow.initialized,
-                        methods, fields);
+                        methods, fields, currentClass);
 
                     if (conditionType.kind != Type::Boolean) {
                         semanticError(
@@ -556,7 +583,7 @@ namespace JAOT {
 
                     (void)analyzeBlock(
                         statement.body, flow, scopes, methods, fields,
-                        method, nextSymbolId);
+                        method, nextSymbolId, currentClass);
 
                     return flow;
                 }
@@ -572,11 +599,12 @@ namespace JAOT {
             const MethodTable &methods,
             const FieldTable &fields,
             const Method &method,
-            std::size_t &nextSymbolId) {
+            std::size_t &nextSymbolId,
+            const std::string &currentClass) {
             for (const Stmt &statement : statements) {
                 flow = analyzeStatement(
                     statement, std::move(flow), scopes, methods, fields,
-                    method, nextSymbolId);
+                    method, nextSymbolId, currentClass);
             }
             return flow;
         }
@@ -584,7 +612,8 @@ namespace JAOT {
         void checkMethod(
             const Method &method,
             const MethodTable &methods,
-            const FieldTable &fields
+            const FieldTable &fields,
+            const std::string &currentClass
         ) {
             Scopes scopes(1);
             Flow flow;
@@ -604,7 +633,7 @@ namespace JAOT {
 
             flow = analyzeStatements(
                 method.body, std::move(flow), scopes, methods, fields,
-                method, nextSymbolId);
+                method, nextSymbolId, currentClass);
 
             if (method.returnType.kind != Type::Void && flow.fallsThrough) {
                 semanticError(
@@ -722,11 +751,12 @@ namespace JAOT {
                 }
 
                 if (!context.methods.emplace(
-                        method.name,
+                        declaration.name + "." + method.name,
                         signatureOf(declaration.name, method)).second) {
                     semanticError(
                         method.location,
-                        "duplicate function: " + method.name
+                        "duplicate method: " + declaration.name + "." +
+                        method.name
                     );
                 }
 
@@ -761,7 +791,9 @@ namespace JAOT {
     ) {
         for (const ClassDeclaration &declaration : program.classes) {
             for (const Method &method : declaration.methods) {
-                checkMethod(method, context.methods, context.fields);
+                checkMethod(
+                    method, context.methods, context.fields,
+                    declaration.name);
             }
         }
     }

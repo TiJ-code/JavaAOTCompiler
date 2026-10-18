@@ -25,12 +25,18 @@ namespace JAOT {
             MethodLowerer(
                 const MethodReturnTypes &returnTypes,
                 const std::unordered_set<std::string> &classNames,
-                const ClassFields &classFields)
-                : returnTypes_(returnTypes), classNames_(classNames), classFields_(classFields), result_() {
+                const ClassFields &classFields,
+                const std::string &currentClass)
+                : returnTypes_(returnTypes),
+                  classNames_(classNames),
+                  classFields_(classFields),
+                  currentClass_(currentClass),
+                  result_() {
             }
 
             IR::Method lower(const Method &method) {
                 result_.signature.name = method.name;
+                result_.signature.ownerClass = currentClass_;
                 result_.signature.returnType = method.returnType;
                 for (const Parameter &parameter : method.parameters) {
                     result_.signature.parameterTypes.push_back(parameter.type);
@@ -248,7 +254,11 @@ namespace JAOT {
                             expression.callee == "printBool") {
                             lowered->type = Type::Void;
                         } else {
-                            const auto found = returnTypes_.find(expression.callee);
+                            const std::string owner = expression.calleeClass.empty()
+                                ? currentClass_
+                                : expression.calleeClass;
+                            const auto found =
+                                returnTypes_.find(owner + "." + expression.callee);
                             if (found == returnTypes_.end()) {
                                 loweringError(
                                     "unresolved function: " + expression.callee);
@@ -452,6 +462,7 @@ namespace JAOT {
             const MethodReturnTypes &returnTypes_;
             const std::unordered_set<std::string> &classNames_;
             const ClassFields &classFields_;
+            const std::string &currentClass_;
             IR::Method result_;
             std::vector<std::unordered_map<std::string, IR::LocalId>> scopes_;
             std::optional<IR::BlockId> currentBlock_;
@@ -478,7 +489,7 @@ namespace JAOT {
                     signature.parameterTypes.push_back(parameter.type);
                 }
                 if (!returnTypes.emplace(
-                        method.name,
+                        declaration.name + "." + method.name,
                         std::move(signature)).second) {
                     loweringError("duplicate method: " + method.name);
                 }
@@ -519,7 +530,8 @@ namespace JAOT {
 
         for (const ClassDeclaration &declaration : program.classes) {
             for (const Method &method : declaration.methods) {
-                MethodLowerer lowerer(returnTypes, classNames, classFields);
+                MethodLowerer lowerer(
+                    returnTypes, classNames, classFields, declaration.name);
                 result.methods.push_back(lowerer.lower(method));
             }
         }

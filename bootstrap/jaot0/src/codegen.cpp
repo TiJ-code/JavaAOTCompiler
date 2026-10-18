@@ -25,15 +25,16 @@ namespace JAOT {
             }
 
             void generate(const IR::Method &method) {
-                methodName_ = method.signature.name;
+                methodName_ = methodSymbol(method.signature);
+                currentClass_ = method.signature.ownerClass;
                 collectLocals(method);
 
                 const int frameSize = (stackSize_ + 15) & ~15;
 
                 out_ << ".text\n";
-                out_ << ".globl jaot_" << method.signature.name << "\n";
-                out_ << ".type jaot_" << method.signature.name << ", @function\n";
-                out_ << "jaot_" << method.signature.name << ":\n";
+                out_ << ".globl jaot_" << methodName_ << "\n";
+                out_ << ".type jaot_" << methodName_ << ", @function\n";
+                out_ << "jaot_" << methodName_ << ":\n";
                 out_ << "    pushq %rbp\n";
                 out_ << "    movq %rsp, %rbp\n";
 
@@ -58,14 +59,14 @@ namespace JAOT {
                 }
 
                 for (const IR::BasicBlock &block : method.blocks) {
-                    out_ << ".Ljaot_" << method.signature.name
+                    out_ << ".Ljaot_" << methodName_
                          << "_block_" << block.id << ":\n";
 
                     for (const IR::Statement &statement : block.statements) {
                         generateStatement(statement);
                     }
 
-                    generateTerminator(method, block.terminator);
+                    generateTerminator(block.terminator);
                 }
             }
 
@@ -157,13 +158,11 @@ namespace JAOT {
                 throw std::runtime_error("unknown IR statement kind");
             }
 
-            void generateTerminator(
-                const IR::Method &method,
-                const IR::Terminator &terminator
-            ) {
+            void generateTerminator(const IR::Terminator &terminator) {
                 switch (terminator.kind) {
                     case IR::TerminatorKind::Jump:
-                        out_ << "    jmp .Ljaot_" << method.signature.name << "_block_" << terminator.target << "\n";
+                        out_ << "    jmp .Ljaot_" << methodName_
+                             << "_block_" << terminator.target << "\n";
                         return;
 
                     case IR::TerminatorKind::Branch:
@@ -173,8 +172,8 @@ namespace JAOT {
 
                         generateExpression(*terminator.condition);
                         out_ << "    testl %eax, %eax\n";
-                        out_ << "    jne .Ljaot_" << method.signature.name << "_block_" << terminator.trueTarget << "\n";
-                        out_ << "    jmp .Ljaot_" << method.signature.name << "_block_" << terminator.falseTarget << "\n";
+                        out_ << "    jne .Ljaot_" << methodName_ << "_block_" << terminator.trueTarget << "\n";
+                        out_ << "    jmp .Ljaot_" << methodName_ << "_block_" << terminator.falseTarget << "\n";
                         return;
 
                     case IR::TerminatorKind::Return:
@@ -418,7 +417,11 @@ namespace JAOT {
                     return;
                 }
 
-                const auto method = methods_.find(expression.callee);
+                const std::string owner = expression.calleeClass.empty()
+                    ? currentClass_
+                    : expression.calleeClass;
+                const auto method = methods_.find(
+                    owner + "." + expression.callee);
                 if (method == methods_.end()) {
                     throw std::runtime_error(
                         "unknown function: " + expression.callee);
@@ -449,7 +452,7 @@ namespace JAOT {
                     stackDepth_ -= 8;
                 }
 
-                emitCall("jaot_" + expression.callee);
+                emitCall("jaot_" + methodSymbol(method->second));
             }
 
             void emitCall(const std::string &name) {
@@ -490,6 +493,7 @@ namespace JAOT {
             int stackSize_ = 0;
             int stackDepth_ = 0;
             std::string methodName_;
+            std::string currentClass_;
             std::size_t divisionLabelCounter_ = 0;
             std::size_t fieldLabelCounter_ = 0;
         };
@@ -512,10 +516,12 @@ namespace JAOT {
 
         for (const IR::Method &method : program.methods) {
             if (!methods.emplace(
-                    method.signature.name,
+                method.signature.ownerClass + "." + method.signature.name,
                 method.signature).second) {
                 throw std::runtime_error(
-                    "duplicate function: " + method.signature.name);
+                "duplicate function: " +
+                method.signature.ownerClass + "." +
+                method.signature.name);
             }
         }
 
