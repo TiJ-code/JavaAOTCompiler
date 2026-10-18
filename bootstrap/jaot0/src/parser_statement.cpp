@@ -19,7 +19,7 @@ namespace JAOT {
     Stmt Parser::parseStatement() {
         if (check(TokenKind::KwInt) || check(TokenKind::KwBoolean)) {
             const ParsedType type = parseType(false);
-            return parseVariableDeclaration(type.type, type.className);
+            return parseVariableDeclaration(type.type);
         }
 
         if (match(TokenKind::KwReturn)) {
@@ -61,7 +61,7 @@ namespace JAOT {
             index_ + 1 < tokens_.size() &&
             tokens_[index_ + 1].kind == TokenKind::Identifier) {
             const ParsedType type = parseType(false);
-            return parseVariableDeclaration(type.type, type.className);
+            return parseVariableDeclaration(type.type);
         }
 
         Stmt statement;
@@ -75,15 +75,13 @@ namespace JAOT {
     }
 
     Stmt Parser::parseVariableDeclaration(
-        const Type type,
-        std::string declaredTypeName
+        TypeRef type
     ) {
         const auto &name = consume(TokenKind::Identifier, "expected variable name");
 
         Stmt statement;
         statement.kind = StmtKind::VarDecl;
-        statement.declaredType = type;
-        statement.declaredTypeName = std::move(declaredTypeName);
+        statement.declaredType = std::move(type);
         statement.name = name.text;
         statement.location = { .line = name.line, .column = name.column };
 

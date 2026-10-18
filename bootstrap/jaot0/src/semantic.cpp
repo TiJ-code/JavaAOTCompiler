@@ -12,17 +12,15 @@ namespace JAOT {
         using Initialized = std::unordered_set<std::size_t>;
 
         struct FieldInfo {
-            Type type;
-            std::string className;
+            TypeRef type;
         };
 
         using FieldTable =
             std::unordered_map<std::string, std::unordered_map<std::string, FieldInfo>>;
 
         struct Symbol {
-            Type type;
+            TypeRef type;
             std::size_t id;
-            std::string className;
         };
 
         using Scope = std::unordered_map<std::string, Symbol>;
@@ -75,8 +73,8 @@ namespace JAOT {
 
             if (expression.kind == ExprKind::Variable) {
                 const Symbol *symbol = findSymbol(scopes, expression.name);
-                if (symbol != nullptr && symbol->type == Type::Reference) {
-                    return symbol->className;
+                if (symbol != nullptr && symbol->type.kind == Type::Reference) {
+                    return symbol->type.className;
                 }
             }
 
@@ -86,8 +84,8 @@ namespace JAOT {
                 if (receiverClass) {
                     const FieldInfo *field =
                         findField(fields, *receiverClass, expression.name);
-                    if (field != nullptr && field->type == Type::Reference) {
-                        return field->className;
+                    if (field != nullptr && field->type.kind == Type::Reference) {
+                        return field->type.className;
                     }
                 }
             }
@@ -95,8 +93,8 @@ namespace JAOT {
             if (expression.kind == ExprKind::Call) {
                 const auto method = methods.find(expression.callee);
                 if (method != methods.end() &&
-                    method->second->returnType == Type::Reference) {
-                    return method->second->returnClassName;
+                    method->second->returnType.kind == Type::Reference) {
+                    return method->second->returnType.className;
                 }
             }
 
@@ -149,7 +147,7 @@ namespace JAOT {
                             expression.location,
                             "variable used before initialization: " + expression.name);
                     }
-                    return symbol->type;
+                    return symbol->type.kind;
                 }
 
                 case ExprKind::FieldAccess: {
@@ -178,7 +176,7 @@ namespace JAOT {
                             expression.location,
                             "unknown field: " + expression.name);
                     }
-                    return field->type;
+                    return field->type.kind;
                 }
 
                 case ExprKind::Binary: {
@@ -324,11 +322,11 @@ namespace JAOT {
 
                         const bool isReferenceAssignableTo = referenceAssignableTo(
                             argument, scopes, methods, fields,
-                            parameter.className
+                            parameter.type.className
                         );
 
-                        if (argumentType != parameter.type ||
-                            (parameter.type == Type::Reference && !isReferenceAssignableTo)) {
+                        if (argumentType != parameter.type.kind ||
+                            (parameter.type.kind == Type::Reference && !isReferenceAssignableTo)) {
                             semanticError(
                                 expression.arguments[i]->location,
                                 "argument type does not match parameter '" +
@@ -336,7 +334,7 @@ namespace JAOT {
                         }
                     }
 
-                    return callee.returnType;
+                    return callee.returnType.kind;
                 }
             }
 
@@ -402,22 +400,22 @@ namespace JAOT {
                             methods,
                             fields);
 
-                        if (statement.declaredType == Type::Reference) {
+                        if (statement.declaredType.kind == Type::Reference) {
                             if (initializerType != Type::Reference ||
                                 !referenceAssignableTo(
                                     *statement.expression, scopes, methods, fields,
-                                    statement.declaredTypeName)) {
+                                    statement.declaredType.className)) {
                                 semanticError(
                                     statement.expression->location,
                                     "reference initializer must have type '" +
-                                    statement.declaredTypeName + "' or null"
+                                    statement.declaredType.className + "' or null"
                                 );
                             }
-                        } else if (initializerType != statement.declaredType) {
+                        } else if (initializerType != statement.declaredType.kind) {
                             semanticError(
                                 statement.expression->location,
                                 "variable initializer must have type " +
-                                std::string(statement.declaredType == Type::Int
+                                std::string(statement.declaredType.kind == Type::Int
                                     ? "int" : "boolean")
                             );
                         }
@@ -427,8 +425,7 @@ namespace JAOT {
                     scopes.back().emplace(
                         statement.name, Symbol{
                             statement.declaredType,
-                            id,
-                            statement.declaredTypeName
+                            id
                     });
                     if (statement.expression) {
                         flow.initialized.insert(id);
@@ -471,25 +468,25 @@ namespace JAOT {
                             "unknown variable: " + statement.name);
                     }
 
-                    if (symbol->type == Type::Reference) {
+                    if (symbol->type.kind == Type::Reference) {
                         if (valueType != Type::Reference ||
                             !referenceAssignableTo(
                                 *statement.expression, scopes, methods, fields,
-                                symbol->className)) {
+                                symbol->type.className)) {
                             semanticError(
                                 statement.expression->location,
                                 "reference assignment must have type '" +
-                                symbol->className + "' or null"
+                                symbol->type.className + "' or null"
                             );
                         }
-                    } else if (valueType != symbol->type) {
+                    } else if (valueType != symbol->type.kind) {
                         semanticError(
                             statement.expression->location,
                             "assignment value must have the same type as its target"
                         );
                     }
 
-                    if (valueType != symbol->type) {
+                    if (valueType != symbol->type.kind) {
                         semanticError(
                             statement.expression->location,
                             "assignment value must have the same type as its target");
@@ -505,7 +502,7 @@ namespace JAOT {
                     return flow;
 
                 case StmtKind::Return:
-                    if (method.returnType == Type::Void) {
+                    if (method.returnType.kind == Type::Void) {
                         if (statement.expression) {
                             semanticError(
                                 statement.location,
@@ -523,20 +520,20 @@ namespace JAOT {
                             flow.initialized,
                             methods,
                             fields);
-                        if (method.returnType == Type::Reference) {
+                        if (method.returnType.kind == Type::Reference) {
                             if (returnType != Type::Reference ||
                                 !referenceAssignableTo(
                                     *statement.expression,
                                     scopes,
                                     methods,
                                     fields,
-                                    method.returnClassName)) {
+                                    method.returnType.className)) {
                                 semanticError(
                                     statement.expression->location,
                                     "return expression must have type '" +
-                                        method.returnClassName + "' or null");
+                                        method.returnType.className + "' or null");
                             }
-                        } else if (returnType != method.returnType) {
+                        } else if (returnType != method.returnType.kind) {
                             semanticError(
                                 statement.expression->location,
                                 "return expression must have the method's declared type");
@@ -644,7 +641,7 @@ namespace JAOT {
                 }
                 const std::size_t id = nextSymbolId++;
                 scopes.back().emplace(
-                    parameter.name, Symbol{parameter.type, id, parameter.className});
+                    parameter.name, Symbol{parameter.type, id});
                 flow.initialized.insert(id);
             }
 
@@ -652,10 +649,10 @@ namespace JAOT {
                 method.body, std::move(flow), scopes, methods, fields,
                 method, nextSymbolId);
 
-            if (method.returnType != Type::Void && flow.fallsThrough) {
+            if (method.returnType.kind != Type::Void && flow.fallsThrough) {
                 semanticError(
                     method.location,
-                    method.returnType == Type::Int
+                    method.returnType.kind == Type::Int
                         ? "int method must return a value"
                         : "boolean method must return a value");
             }
@@ -677,20 +674,20 @@ namespace JAOT {
 
         for (const ClassDeclaration &declaration : program.classes) {
             for (const Method &method : declaration.methods) {
-                if (method.returnType == Type::Reference &&
-                    !classNames.contains(method.returnClassName)) {
+                if (method.returnType.kind == Type::Reference &&
+                    !classNames.contains(method.returnType.className)) {
                     semanticError(
                         method.location,
-                        "unknown return type: " + method.returnClassName
+                        "unknown return type: " + method.returnType.className
                     );
                 }
 
                 for (const Parameter &parameter : method.parameters) {
-                    if (parameter.type == Type::Reference &&
-                        !classNames.contains(parameter.className)) {
+                    if (parameter.type.kind == Type::Reference &&
+                        !classNames.contains(parameter.type.className)) {
                         semanticError(
                             parameter.location,
-                            "unknown parameter type: " + parameter.className
+                            "unknown parameter type: " + parameter.type.className
                         );
                     }
                 }
@@ -722,24 +719,17 @@ namespace JAOT {
                     );
                 }
 
-                if (field.typeName != "int" &&
-                    field.typeName != "boolean" &&
-                    !classNames.contains(field.typeName)) {
+                if (field.type.kind == Type::Reference &&
+                    !classNames.contains(field.type.className)) {
                     semanticError(
                         field.location,
-                        "unknown field: " + field.typeName
+                        "unknown field: " + field.type.className
                     );
                 }
 
-                const Type fieldType = field.typeName == "int"
-                    ? Type::Int
-                    : field.typeName == "boolean" ? Type::Boolean : Type::Reference;
                 fields[declaration.name].emplace(
                     field.name,
-                    FieldInfo{
-                        fieldType,
-                        fieldType == Type::Reference ? field.typeName : ""
-                    });
+                    FieldInfo{field.type});
             }
         }
 
@@ -774,7 +764,7 @@ namespace JAOT {
             );
         }
 
-        if (mainMethod->returnType != Type::Void ||
+        if (mainMethod->returnType.kind != Type::Void ||
             !mainMethod->parameters.empty()) {
             semanticError(
                 mainMethod->location,

@@ -31,21 +31,22 @@ namespace JAOT {
                 const MethodReturnTypes &returnTypes,
                 const std::unordered_set<std::string> &classNames,
                 const ClassFields &classFields)
-                : returnTypes_(returnTypes), classNames_(classNames), classFields_(classFields) {}
+                : returnTypes_(returnTypes), classNames_(classNames), classFields_(classFields), result_() {
+            }
 
             IR::Method lower(const Method &method) {
                 result_.name = method.name;
-                result_.returnType = method.returnType;
-                result_.returnClassName = method.returnClassName;
+                result_.returnType = method.returnType.kind;
+                result_.returnClassName = method.returnType.className;
                 scopes_.emplace_back();
 
                 for (const Parameter &parameter : method.parameters) {
                     const IR::LocalId id =
                         addLocal(
                             parameter.name,
-                            parameter.type,
+                            parameter.type.kind,
                             true,
-                            parameter.className);
+                            parameter.type.className);
                     result_.parameters.push_back(id);
                 }
 
@@ -58,7 +59,7 @@ namespace JAOT {
 
                 if (currentBlock_) {
                     IR::Terminator &terminator = block(*currentBlock_).terminator;
-                    if (method.returnType != Type::Void) {
+                    if (method.returnType.kind != Type::Void) {
                         loweringError(
                             "non-void method is missing return: " + method.name);
                     }
@@ -289,10 +290,10 @@ namespace JAOT {
             void lowerStatement(const Stmt &statement) {
                 switch (statement.kind) {
                     case StmtKind::VarDecl: {
-                        if (statement.declaredType == Type::Reference &&
-                            !classNames_.contains(statement.declaredTypeName)) {
+                        if (statement.declaredType.kind == Type::Reference &&
+                            !classNames_.contains(statement.declaredType.className)) {
                             loweringError(
-                                "unknown class: " + statement.declaredTypeName);
+                                "unknown class: " + statement.declaredType.className);
                         }
 
                         std::unique_ptr<IR::Expr> initializer;
@@ -302,9 +303,9 @@ namespace JAOT {
 
                         const IR::LocalId id = addLocal(
                             statement.name,
-                            statement.declaredType,
+                            statement.declaredType.kind,
                             false,
-                            statement.declaredTypeName
+                            statement.declaredType.className
                         );
 
                         if (initializer) {
@@ -469,8 +470,8 @@ namespace JAOT {
                 if (!returnTypes.emplace(
                         method.name,
                         MethodSignature{
-                            method.returnType,
-                            method.returnClassName}).second) {
+                            method.returnType.kind,
+                            method.returnType.className}).second) {
                     loweringError("duplicate method: " + method.name);
                 }
             }
@@ -489,10 +490,15 @@ namespace JAOT {
             for (const Field &field : declaration.fields) {
                 irClass.fields.push_back({
                     .name = field.name,
-                    .typeName = field.typeName,
+                    .typeName = field.type.kind == Type::Int
+                        ? "int"
+                        : field.type.kind == Type::Boolean
+                            ? "boolean"
+                            : field.type.className,
                     .offset = offset
                 });
-                offset += field.typeName == "int" || field.typeName == "boolean"
+                offset += field.type.kind == Type::Int ||
+                    field.type.kind == Type::Boolean
                     ? 4
                     : 8;
             }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <string>
 
 namespace JAOT {
     enum class Type {
@@ -8,6 +9,11 @@ namespace JAOT {
         Boolean,
         Reference,
         Void,
+    };
+
+    struct TypeRef {
+        Type kind;
+        std::string className;
     };
 
     struct SourceLocation {

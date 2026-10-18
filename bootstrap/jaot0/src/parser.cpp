@@ -42,16 +42,14 @@ namespace JAOT {
 
         if (match(TokenKind::KwInt)) {
             return ParsedType {
-                .type = Type::Int,
-                .className = {},
+                .type = {.kind = Type::Int, .className = {}},
                 .location = {.line = token.line, .column = token.column}
             };
         }
 
         if (match(TokenKind::KwBoolean)) {
             return ParsedType {
-                .type = Type::Boolean,
-                .className = {},
+                .type = {.kind = Type::Boolean, .className = {}},
                 .location = {.line = token.line, .column = token.column}
             };
         }
@@ -64,8 +62,7 @@ namespace JAOT {
             match(TokenKind::KwVoid);
 
             return ParsedType {
-                .type = Type::Void,
-                .className = {},
+                .type = {.kind = Type::Void, .className = {}},
                 .location = {.line = token.line, .column = token.column}
             };
         }
@@ -74,8 +71,7 @@ namespace JAOT {
             const Token &classToken = consume(TokenKind::Identifier, "expected type");
 
             return ParsedType {
-                .type = Type::Reference,
-                .className = classToken.text,
+                .type = {.kind = Type::Reference, .className = classToken.text},
                 .location = {.line = classToken.line, .column = classToken.column}
             };
         }
@@ -125,18 +121,12 @@ namespace JAOT {
 
     Field Parser::parseField() {
         const ParsedType type = parseType(false);
-        const std::string typeName =
-            type.type == Type::Reference
-            ? type.className
-            : type.type == Type::Int
-                ? "int"
-                : "boolean";
 
         const Token &name = consume(TokenKind::Identifier, "expected field name");
         consume(TokenKind::Semicolon, "expected ';' after field declaration");
 
         return {
-            .typeName = typeName,
+            .type = type.type,
             .name = name.text,
             .location = type.location
         };
@@ -153,7 +143,6 @@ namespace JAOT {
 
         Method method;
         method.returnType = returnType.type;
-        method.returnClassName = returnType.className;
         method.name = name.text;
         method.location = returnType.location;
 
@@ -166,7 +155,6 @@ namespace JAOT {
 
                 method.parameters.push_back({
                     .type = parameterType.type,
-                    .className = parameterType.className,
                     .name = parameter.text,
                     .location = parameterType.location
                 });

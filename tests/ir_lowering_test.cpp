@@ -54,13 +54,14 @@ int main() {
             "first class should be Node");
         require(ast.classes[0].fields.size() == 3,
             "Node should have three fields");
-        require(ast.classes[0].fields[0].typeName == "int" &&
+        require(ast.classes[0].fields[0].type.kind == JAOT::Type::Int &&
                 ast.classes[0].fields[0].name == "value",
             "first Node field should be int value");
-        require(ast.classes[0].fields[1].typeName == "boolean" &&
+        require(ast.classes[0].fields[1].type.kind == JAOT::Type::Boolean &&
                 ast.classes[0].fields[1].name == "marked",
             "second Node field should be boolean marked");
-        require(ast.classes[0].fields[2].typeName == "Link" &&
+        require(ast.classes[0].fields[2].type.kind == JAOT::Type::Reference &&
+                ast.classes[0].fields[2].type.className == "Link" &&
                 ast.classes[0].fields[2].name == "next",
             "third Node field should be Link next");
 
@@ -74,7 +75,8 @@ int main() {
         require(ast.classes[2].name == "Link",
             "third class should be Link");
         require(ast.classes[2].fields.size() == 1 &&
-                ast.classes[2].fields[0].typeName == "Node",
+                ast.classes[2].fields[0].type.kind == JAOT::Type::Reference &&
+                ast.classes[2].fields[0].type.className == "Node",
             "Link should have a Node reference field");
 
         JAOT::IrLowerer lowerer;

@@ -53,10 +53,9 @@ namespace JAOT {
     struct Stmt {
         StmtKind kind;
         SourceLocation location {};
-        Type declaredType = Type::Int;
+        TypeRef declaredType {.kind = Type::Int, .className = {}};
 
         std::string name;
-        std::string declaredTypeName;
         std::unique_ptr<Expr> expression;
         std::unique_ptr<Expr> assignmentTarget;
         std::unique_ptr<Expr> condition;
@@ -67,21 +66,19 @@ namespace JAOT {
     };
 
     struct Parameter {
-        Type type;
-        std::string className;
+        TypeRef type {.kind = Type::Int, .className = {}};
         std::string name;
         SourceLocation location {};
     };
 
     struct Field {
-        std::string typeName;
+        TypeRef type {.kind = Type::Int, .className = {}};
         std::string name;
         SourceLocation location {};
     };
 
     struct Method {
-        Type returnType;
-        std::string returnClassName;
+        TypeRef returnType {.kind = Type::Void, .className = {}};
         std::string name;
         std::vector<Parameter> parameters;
         std::vector<Stmt> body;
@@ -100,8 +97,7 @@ namespace JAOT {
     };
 
     struct ParsedType {
-        Type type;
-        std::string className;
+        TypeRef type;
         SourceLocation location {};
     };
 
@@ -134,9 +130,7 @@ namespace JAOT {
 
         Stmt parseStatement();
 
-        Stmt parseVariableDeclaration(
-            Type type,
-            std::string declaredTypeName = {});
+        Stmt parseVariableDeclaration(TypeRef type);
 
         Stmt parseAssignment();
 
