@@ -13,7 +13,12 @@
 
 namespace JAOT {
     namespace {
-        using MethodReturnTypes = std::unordered_map<std::string, Type>;
+        struct MethodSignature {
+            Type returnType;
+            std::string returnClassName;
+        };
+
+        using MethodReturnTypes = std::unordered_map<std::string, MethodSignature>;
         using ClassFields = std::unordered_map<std::string, std::vector<IR::Field>>;
 
         [[noreturn]] void loweringError(const std::string &message) {
@@ -31,11 +36,16 @@ namespace JAOT {
             IR::Method lower(const Method &method) {
                 result_.name = method.name;
                 result_.returnType = method.returnType;
+                result_.returnClassName = method.returnClassName;
                 scopes_.emplace_back();
 
                 for (const Parameter &parameter : method.parameters) {
                     const IR::LocalId id =
-                        addLocal(parameter.name, parameter.type, true);
+                        addLocal(
+                            parameter.name,
+                            parameter.type,
+                            true,
+                            parameter.className);
                     result_.parameters.push_back(id);
                 }
 
@@ -240,7 +250,8 @@ namespace JAOT {
                                 loweringError(
                                     "unresolved function: " + expression.callee);
                             }
-                            lowered->type = found->second;
+                            lowered->type = found->second.returnType;
+                            lowered->className = found->second.returnClassName;
                         }
                         for (const auto &argument : expression.arguments) {
                             lowered->arguments.push_back(
@@ -455,7 +466,11 @@ namespace JAOT {
             methodCount += declaration.methods.size();
 
             for (const Method &method : declaration.methods) {
-                if (!returnTypes.emplace(method.name, method.returnType).second) {
+                if (!returnTypes.emplace(
+                        method.name,
+                        MethodSignature{
+                            method.returnType,
+                            method.returnClassName}).second) {
                     loweringError("duplicate method: " + method.name);
                 }
             }

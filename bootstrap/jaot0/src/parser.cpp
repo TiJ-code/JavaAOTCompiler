@@ -145,6 +145,7 @@ namespace JAOT {
         consume(TokenKind::KwStatic, "expected 'static'");
 
         const auto &returnTypeToken = current();
+        std::string returnClassName;
         Type returnType;
 
         if (match(TokenKind::KwVoid)) {
@@ -153,6 +154,10 @@ namespace JAOT {
             returnType = Type::Int;
         } else if (match(TokenKind::KwBoolean)) {
             returnType = Type::Boolean;
+        } else if (check(TokenKind::Identifier)) {
+            const Token &classType = consume(TokenKind::Identifier, "expected return type");
+            returnClassName = classType.text;
+            returnType = Type::Reference;
         } else {
             error("unexpected method return type");
         }
@@ -163,17 +168,34 @@ namespace JAOT {
 
         Method method;
         method.returnType = returnType;
+        method.returnClassName = returnClassName;
         method.name = name.text;
         method.location = { .line = returnTypeToken.line, .column = returnTypeToken.column };
 
         if (!check(TokenKind::RParen)) {
             while (true) {
-                const Type parameterType = parseValueType();
+                Type parameterType;
+                std::string parameterClassName;
+
+                if (match(TokenKind::KwInt)) {
+                    parameterType = Type::Int;
+                } else if (match(TokenKind::KwBoolean)) {
+                    parameterType = Type::Boolean;
+                } else if (check(TokenKind::Identifier)) {
+                    const Token &classType =
+                        consume(TokenKind::Identifier, "expected parameter type");
+                    parameterType = Type::Reference;
+                    parameterClassName = classType.text;
+                } else {
+                    error("unexpected parameter type");
+                }
+
                 const auto &parameter =
                         consume(TokenKind::Identifier, "expected parameter name");
 
                 method.parameters.push_back({
                     .type = parameterType,
+                    .className = parameterClassName,
                     .name = parameter.text,
                     .location = {
                         .line = parameter.line,

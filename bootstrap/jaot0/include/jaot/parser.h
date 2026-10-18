@@ -68,6 +68,7 @@ namespace JAOT {
 
     struct Parameter {
         Type type;
+        std::string className;
         std::string name;
         SourceLocation location {};
     };
@@ -80,6 +81,7 @@ namespace JAOT {
 
     struct Method {
         Type returnType;
+        std::string returnClassName;
         std::string name;
         std::vector<Parameter> parameters;
         std::vector<Stmt> body;

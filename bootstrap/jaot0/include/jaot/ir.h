@@ -93,6 +93,7 @@ namespace JAOT::IR {
     struct Method {
         std::string name;
         Type returnType;
+        std::string returnClassName;
         std::vector<LocalId> parameters;
         std::vector<Local> locals;
         std::vector<BasicBlock> blocks;

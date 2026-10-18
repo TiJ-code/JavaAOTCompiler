@@ -66,6 +66,7 @@ namespace JAOT {
         std::optional<std::string> referenceClassName(
             const Expr &expression,
             const Scopes &scopes,
+            const MethodTable &methods,
             const FieldTable &fields
         ) {
             if (expression.kind == ExprKind::NewObject) {
@@ -81,7 +82,7 @@ namespace JAOT {
 
             if (expression.kind == ExprKind::FieldAccess && expression.left) {
                 const auto receiverClass =
-                    referenceClassName(*expression.left, scopes, fields);
+                    referenceClassName(*expression.left, scopes, methods, fields);
                 if (receiverClass) {
                     const FieldInfo *field =
                         findField(fields, *receiverClass, expression.name);
@@ -91,12 +92,21 @@ namespace JAOT {
                 }
             }
 
+            if (expression.kind == ExprKind::Call) {
+                const auto method = methods.find(expression.callee);
+                if (method != methods.end() &&
+                    method->second->returnType == Type::Reference) {
+                    return method->second->returnClassName;
+                }
+            }
+
             return std::nullopt;
         }
 
         bool referenceAssignableTo(
             const Expr &expression,
             const Scopes &scopes,
+            const MethodTable &methods,
             const FieldTable &fields,
             const std::string &targetClassName
         ) {
@@ -105,7 +115,7 @@ namespace JAOT {
             }
 
             const auto sourceClassName =
-                referenceClassName(expression, scopes, fields);
+                referenceClassName(expression, scopes, methods, fields);
             return sourceClassName.has_value() && *sourceClassName == targetClassName;
         }
 
@@ -154,7 +164,8 @@ namespace JAOT {
                             "field access requires a reference receiver");
                     }
                     const auto receiverClass =
-                        referenceClassName(*expression.left, scopes, fields);
+                        referenceClassName(
+                            *expression.left, scopes, methods, fields);
                     if (!receiverClass) {
                         semanticError(
                             expression.location,
@@ -199,9 +210,11 @@ namespace JAOT {
                     if (expression.op == "==" || expression.op == "!=") {
                         if (left == Type::Reference) {
                             const auto leftClassName =
-                                referenceClassName(*expression.left, scopes, fields);
+                                referenceClassName(
+                                    *expression.left, scopes, methods, fields);
                             const auto rightClassName =
-                                referenceClassName(*expression.right, scopes, fields);
+                                referenceClassName(
+                                    *expression.right, scopes, methods, fields);
 
                             if (leftClassName.has_value() &&
                                 rightClassName.has_value() &&
@@ -302,13 +315,20 @@ namespace JAOT {
                     }
 
                     for (std::size_t i = 0; i < expression.arguments.size(); ++i) {
+                        const Expr &argument = *expression.arguments[i];
+                        const Parameter &parameter = callee.parameters[i];
+
                         const Type argumentType = checkExpression(
-                            *expression.arguments[i],
-                            scopes,
-                            initialized,
-                            methods,
-                            fields);
-                        if (argumentType != callee.parameters[i].type) {
+                            argument, scopes, initialized, methods, fields
+                        );
+
+                        const bool isReferenceAssignableTo = referenceAssignableTo(
+                            argument, scopes, methods, fields,
+                            parameter.className
+                        );
+
+                        if (argumentType != parameter.type ||
+                            (parameter.type == Type::Reference && !isReferenceAssignableTo)) {
                             semanticError(
                                 expression.arguments[i]->location,
                                 "argument type does not match parameter '" +
@@ -385,7 +405,7 @@ namespace JAOT {
                         if (statement.declaredType == Type::Reference) {
                             if (initializerType != Type::Reference ||
                                 !referenceAssignableTo(
-                                    *statement.expression, scopes, fields,
+                                    *statement.expression, scopes, methods, fields,
                                     statement.declaredTypeName)) {
                                 semanticError(
                                     statement.expression->location,
@@ -427,10 +447,10 @@ namespace JAOT {
                             flow.initialized, methods, fields);
                         if (targetType == Type::Reference) {
                             const auto targetClass = referenceClassName(
-                                *statement.assignmentTarget, scopes, fields);
+                                *statement.assignmentTarget, scopes, methods, fields);
                             if (!targetClass || valueType != Type::Reference ||
                                 !referenceAssignableTo(
-                                    *statement.expression, scopes, fields,
+                                    *statement.expression, scopes, methods, fields,
                                     *targetClass)) {
                                 semanticError(
                                     statement.expression->location,
@@ -454,7 +474,7 @@ namespace JAOT {
                     if (symbol->type == Type::Reference) {
                         if (valueType != Type::Reference ||
                             !referenceAssignableTo(
-                                *statement.expression, scopes, fields,
+                                *statement.expression, scopes, methods, fields,
                                 symbol->className)) {
                             semanticError(
                                 statement.expression->location,
@@ -503,7 +523,20 @@ namespace JAOT {
                             flow.initialized,
                             methods,
                             fields);
-                        if (returnType != method.returnType) {
+                        if (method.returnType == Type::Reference) {
+                            if (returnType != Type::Reference ||
+                                !referenceAssignableTo(
+                                    *statement.expression,
+                                    scopes,
+                                    methods,
+                                    fields,
+                                    method.returnClassName)) {
+                                semanticError(
+                                    statement.expression->location,
+                                    "return expression must have type '" +
+                                        method.returnClassName + "' or null");
+                            }
+                        } else if (returnType != method.returnType) {
                             semanticError(
                                 statement.expression->location,
                                 "return expression must have the method's declared type");
@@ -597,7 +630,8 @@ namespace JAOT {
         void checkMethod(
             const Method &method,
             const MethodTable &methods,
-            const FieldTable &fields) {
+            const FieldTable &fields
+        ) {
             Scopes scopes(1);
             Flow flow;
             std::size_t nextSymbolId = 0;
@@ -610,7 +644,7 @@ namespace JAOT {
                 }
                 const std::size_t id = nextSymbolId++;
                 scopes.back().emplace(
-                    parameter.name, Symbol{parameter.type, id, {}});
+                    parameter.name, Symbol{parameter.type, id, parameter.className});
                 flow.initialized.insert(id);
             }
 
@@ -638,6 +672,28 @@ namespace JAOT {
                     declaration.location,
                     "duplicate class: " + declaration.name
                 );
+            }
+        }
+
+        for (const ClassDeclaration &declaration : program.classes) {
+            for (const Method &method : declaration.methods) {
+                if (method.returnType == Type::Reference &&
+                    !classNames.contains(method.returnClassName)) {
+                    semanticError(
+                        method.location,
+                        "unknown return type: " + method.returnClassName
+                    );
+                }
+
+                for (const Parameter &parameter : method.parameters) {
+                    if (parameter.type == Type::Reference &&
+                        !classNames.contains(parameter.className)) {
+                        semanticError(
+                            parameter.location,
+                            "unknown parameter type: " + parameter.className
+                        );
+                    }
+                }
             }
         }
 
