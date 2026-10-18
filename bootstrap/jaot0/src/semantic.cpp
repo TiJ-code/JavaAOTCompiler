@@ -146,7 +146,8 @@ namespace JAOT {
                         if (left.kind != Type::Int || right.kind != Type::Int) {
                             semanticError(
                                 expression.location,
-                                "arithmetic operands must have type int");
+                                "arithmetic operands must have type int (left: " +
+                                typeName(left) + ", right: " + typeName(right) + ")");
                         }
                         return TypeRef{Type::Int, {}};
                     }
@@ -156,7 +157,8 @@ namespace JAOT {
                         if (left.kind != Type::Int || right.kind != Type::Int) {
                             semanticError(
                                 expression.location,
-                                "relational operands must have type int");
+                                "relational operands must have type int (left: " +
+                                typeName(left) + ", right: " + typeName(right) + ")");
                         }
                         return TypeRef{Type::Boolean, {}};
                     }
@@ -166,7 +168,8 @@ namespace JAOT {
                             !isAssignable(right, left)) {
                                 semanticError(
                                     expression.location,
-                                    "equality operands must have the same reference type or be null"
+                                    "equality operands must have the same reference type or be null (left: " +
+                                    typeName(left) + ", right: " + typeName(right) + ")"
                                 );
                         }
 
@@ -176,14 +179,18 @@ namespace JAOT {
                              left.kind != Type::Reference)) {
                             semanticError(
                                 expression.location,
-                                "equality operands must have the same value type");
+                                "equality operands must have the same value type (left: " +
+                                typeName(left) + ", right: " + typeName(right) + ")");
                         }
                         return TypeRef{Type::Boolean, {}};
                     }
 
                     if (expression.op == "&&" || expression.op == "||") {
                         if (left.kind != Type::Boolean || right.kind != Type::Boolean) {
-                            semanticError(expression.location, "logical operators require boolean operands");
+                            semanticError(
+                                expression.location,
+                                "logical operators require boolean operands (left: " +
+                                typeName(left) + ", right: " + typeName(right) + ")");
                         }
 
                         return TypeRef{Type::Boolean, {}};
@@ -197,7 +204,10 @@ namespace JAOT {
                         *expression.operand, scopes, initialized, methods, fields);
 
                     if (operandType.kind != Type::Boolean) {
-                        semanticError(expression.location, "logical negation requires a boolean operand");
+                        semanticError(
+                            expression.location,
+                            "logical negation requires a boolean operand (actual: " +
+                            typeName(operandType) + ")");
                     }
 
                     return TypeRef{Type::Boolean, {}};
@@ -210,15 +220,17 @@ namespace JAOT {
                                 expression.location,
                                 "printInt expects one argument");
                         }
-                        if (checkExpression(
+                        const TypeRef argumentType = checkExpression(
                                 *expression.arguments[0],
                                 scopes,
                                 initialized,
                                 methods,
-                                fields).kind != Type::Int) {
+                                fields);
+                        if (argumentType.kind != Type::Int) {
                             semanticError(
                                 expression.arguments[0]->location,
-                                "printInt argument must have type int");
+                                "printInt argument must have type int (actual: " +
+                                typeName(argumentType) + ")");
                         }
                         return TypeRef{Type::Void, {}};
                     }
@@ -230,15 +242,17 @@ namespace JAOT {
                                 "printBool expects one argument"
                             );
                         }
-                        if (checkExpression(
+                        const TypeRef argumentType = checkExpression(
                                 *expression.arguments[0],
                                 scopes,
                                 initialized,
                                 methods,
-                                fields).kind != Type::Boolean) {
+                                fields);
+                        if (argumentType.kind != Type::Boolean) {
                             semanticError(
                                 expression.arguments[0]->location,
-                                "printBool arguments must have type boolean");
+                                "printBool arguments must have type boolean (actual: " +
+                                typeName(argumentType) + ")");
                         }
                         return TypeRef{Type::Void, {}};
                     }
@@ -276,8 +290,10 @@ namespace JAOT {
                         if (!isAssignable(argumentType, parameter)) {
                             semanticError(
                                 expression.arguments[i]->location,
-                                "argument type does not match parameter '" +
-                                std::to_string(i));
+                                "argument " + std::to_string(i) +
+                                " type does not match parameter (expected: " +
+                                typeName(parameter) + ", actual: " +
+                                typeName(argumentType) + ")");
                         }
                     }
 
@@ -352,7 +368,9 @@ namespace JAOT {
                                 semanticError(
                                     statement.expression->location,
                                     "reference initializer must have type '" +
-                                    statement.declaredType.className + "' or null"
+                                    statement.declaredType.className +
+                                    "' or null (actual: " +
+                                    typeName(initializerType) + ")"
                                 );
                             }
                         } else if (!sameType(initializerType, statement.declaredType)) {
@@ -360,7 +378,8 @@ namespace JAOT {
                                 statement.expression->location,
                                 "variable initializer must have type " +
                                 std::string(statement.declaredType.kind == Type::Int
-                                    ? "int" : "boolean")
+                                    ? "int" : "boolean") +
+                                " (actual: " + typeName(initializerType) + ")"
                             );
                         }
                     }
@@ -390,12 +409,16 @@ namespace JAOT {
                             if (!isAssignable(valueType, targetType)) {
                                 semanticError(
                                     statement.expression->location,
-                                    "reference assignment must match the field type or be null");
+                                    "reference assignment must match the field type or be null (expected: " +
+                                    typeName(targetType) + ", actual: " +
+                                    typeName(valueType) + ")");
                             }
                         } else if (!sameType(valueType, targetType)) {
                             semanticError(
                                 statement.expression->location,
-                                "assignment value must have the same type as its target");
+                                "assignment value must have the same type as its target (expected: " +
+                                typeName(targetType) + ", actual: " +
+                                typeName(valueType) + ")");
                         }
                         return flow;
                     }
@@ -412,13 +435,16 @@ namespace JAOT {
                             semanticError(
                                 statement.expression->location,
                                 "reference assignment must have type '" +
-                                symbol->type.className + "' or null"
+                                symbol->type.className + "' or null (actual: " +
+                                typeName(valueType) + ")"
                             );
                         }
                     } else if (!sameType(valueType, symbol->type)) {
                         semanticError(
                             statement.expression->location,
-                            "assignment value must have the same type as its target"
+                            "assignment value must have the same type as its target (expected: " +
+                            typeName(symbol->type) + ", actual: " +
+                            typeName(valueType) + ")"
                         );
                     }
 
@@ -456,12 +482,16 @@ namespace JAOT {
                                 semanticError(
                                     statement.expression->location,
                                     "return expression must have type '" +
-                                        method.returnType.className + "' or null");
+                                        method.returnType.className +
+                                        "' or null (actual: " +
+                                        typeName(returnType) + ")");
                             }
                         } else if (!sameType(returnType, method.returnType)) {
                             semanticError(
                                 statement.expression->location,
-                                "return expression must have the method's declared type");
+                                "return expression must have the method's declared type (expected: " +
+                                typeName(method.returnType) + ", actual: " +
+                                typeName(returnType) + ")");
                         }
                     }
                     flow.fallsThrough = false;
@@ -479,7 +509,8 @@ namespace JAOT {
                     if (conditionType.kind != Type::Boolean) {
                         semanticError(
                             statement.condition->location,
-                            "if condition must have type boolean");
+                            "if condition must have type boolean (actual: " +
+                            typeName(conditionType) + ")");
                     }
 
                     Flow thenFlow = analyzeBlock(
@@ -519,7 +550,8 @@ namespace JAOT {
                     if (conditionType.kind != Type::Boolean) {
                         semanticError(
                             statement.condition->location,
-                            "while condition must have type boolean");
+                            "while condition must have type boolean (actual: " +
+                            typeName(conditionType) + ")");
                     }
 
                     (void)analyzeBlock(
