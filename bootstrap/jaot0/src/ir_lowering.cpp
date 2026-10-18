@@ -1,5 +1,7 @@
 #include "jaot/ir_lowering.h"
 
+#include <algorithm>
+
 #include "jaot/parser.h"
 
 #include <limits>
@@ -12,6 +14,7 @@
 namespace JAOT {
     namespace {
         using MethodReturnTypes = std::unordered_map<std::string, Type>;
+        using ClassFields = std::unordered_map<std::string, std::vector<IR::Field>>;
 
         [[noreturn]] void loweringError(const std::string &message) {
             throw std::runtime_error("IR lowering error: " + message);
@@ -21,8 +24,9 @@ namespace JAOT {
         public:
             MethodLowerer(
                 const MethodReturnTypes &returnTypes,
-                const std::unordered_set<std::string> &classNames)
-                : returnTypes_(returnTypes), classNames_(classNames) {}
+                const std::unordered_set<std::string> &classNames,
+                const ClassFields &classFields)
+                : returnTypes_(returnTypes), classNames_(classNames), classFields_(classFields) {}
 
             IR::Method lower(const Method &method) {
                 result_.name = method.name;
@@ -166,6 +170,45 @@ namespace JAOT {
                         lowered->className = localClassName(lowered->local);
                         return lowered;
 
+                    case ExprKind::FieldAccess: {
+                        if (!expression.left) {
+                            loweringError("incomplete field access");
+                        }
+
+                        lowered->kind = IR::ExprKind::FieldAccess;
+                        lowered->left = lowerExpression(*expression.left);
+
+                        if (lowered->left->type != Type::Reference) {
+                            loweringError("field receiver is not a reference");
+                        }
+
+                        const auto classFields = classFields_.find(lowered->left->className);
+
+                        if (classFields == classFields_.end()) {
+                            loweringError("unknown class: " + lowered->left->className);
+                        }
+
+                        const auto field = std::ranges::find_if(
+                            classFields->second,
+                            [&expression](const IR::Field &candidate) {
+                                 return candidate.name == expression.name;
+                            }
+                        );
+
+                        lowered->fieldOffset = field->offset;
+
+                        if (field->typeName == "int") {
+                            lowered->type = Type::Int;
+                        } else if (field->typeName == "boolean") {
+                            lowered->type = Type::Boolean;
+                        } else {
+                            lowered->type = Type::Reference;
+                            lowered->className = field->typeName;
+                        }
+
+                        return lowered;
+                    }
+
                     case ExprKind::Binary:
                         lowered->kind = IR::ExprKind::Binary;
                         lowered->binaryOperator = expression.op;
@@ -265,6 +308,16 @@ namespace JAOT {
                     }
 
                     case StmtKind::Assignment: {
+                        if (statement.assignmentTarget) {
+                            IR::Statement assignment;
+                            assignment.kind = IR::StatementKind::AssignField;
+                            assignment.location = statement.location;
+                            assignment.targetExpression = lowerExpression(*statement.assignmentTarget);
+                            assignment.expression = lowerExpression(*statement.expression);
+                            appendStatement(std::move(assignment));
+                            return;
+                        }
+
                         IR::Statement assignment;
                         assignment.kind = IR::StatementKind::AssignLocal;
                         assignment.location = statement.location;
@@ -384,6 +437,7 @@ namespace JAOT {
 
             const MethodReturnTypes &returnTypes_;
             const std::unordered_set<std::string> &classNames_;
+            const ClassFields &classFields_;
             IR::Method result_;
             std::vector<std::unordered_map<std::string, IR::LocalId>> scopes_;
             std::optional<IR::BlockId> currentBlock_;
@@ -393,6 +447,7 @@ namespace JAOT {
     IR::Program IrLowerer::lower(const Program &program) const {
         MethodReturnTypes returnTypes;
         std::unordered_set<std::string> classNames;
+        ClassFields classFields;
         std::size_t methodCount = 0;
 
         for (const ClassDeclaration &declaration : program.classes) {
@@ -414,10 +469,20 @@ namespace JAOT {
             irClass.name = declaration.name;
             irClass.fields.reserve(declaration.fields.size());
 
+            std::size_t offset = 0;
+
             for (const Field &field : declaration.fields) {
-                irClass.fields.push_back({.name = field.name, .typeName = field.typeName});
+                irClass.fields.push_back({
+                    .name = field.name,
+                    .typeName = field.typeName,
+                    .offset = offset
+                });
+                offset += field.typeName == "int" || field.typeName == "boolean"
+                    ? 4
+                    : 8;
             }
 
+            classFields.emplace(declaration.name, irClass.fields);
             result.classes.push_back(std::move(irClass));
         }
 
@@ -425,7 +490,7 @@ namespace JAOT {
 
         for (const ClassDeclaration &declaration : program.classes) {
             for (const Method &method : declaration.methods) {
-                MethodLowerer lowerer(returnTypes, classNames);
+                MethodLowerer lowerer(returnTypes, classNames, classFields);
                 result.methods.push_back(lowerer.lower(method));
             }
         }

@@ -17,6 +17,7 @@ namespace JAOT::IR {
         Null,
         NewObject,
         Local,
+        FieldAccess,
         Unary,
         Binary,
         Call,
@@ -31,6 +32,8 @@ namespace JAOT::IR {
         bool boolean = false;
         LocalId local = 0;
         std::string className;
+        std::size_t fieldOffset = 0;
+
         std::string binaryOperator;
         std::string unaryOperator;
         std::string callee;
@@ -51,6 +54,7 @@ namespace JAOT::IR {
 
     enum class StatementKind {
         AssignLocal,
+        AssignField,
         Evaluate,
     };
 
@@ -58,6 +62,7 @@ namespace JAOT::IR {
         StatementKind kind;
         SourceLocation location {};
         LocalId target = 0;
+        std::unique_ptr<Expr> targetExpression;
         std::unique_ptr<Expr> expression;
     };
 
@@ -96,6 +101,7 @@ namespace JAOT::IR {
     struct Field {
         std::string name;
         std::string typeName;
+        std::size_t offset = 0;
     };
 
     struct Class {

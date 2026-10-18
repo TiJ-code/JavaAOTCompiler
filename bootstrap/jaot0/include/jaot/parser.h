@@ -15,6 +15,7 @@ namespace JAOT {
         Null,
         NewObject,
         Variable,
+        FieldAccess,
         Binary,
         Unary,
         Call,
@@ -57,6 +58,7 @@ namespace JAOT {
         std::string name;
         std::string declaredTypeName;
         std::unique_ptr<Expr> expression;
+        std::unique_ptr<Expr> assignmentTarget;
         std::unique_ptr<Expr> condition;
 
         std::vector<Stmt> body;

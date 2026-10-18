@@ -31,6 +31,7 @@ namespace JAOT {
         RParen,
         Semicolon,
         Comma,
+        Dot,
 
         Plus,
         Minus,

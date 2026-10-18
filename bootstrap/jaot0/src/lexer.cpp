@@ -92,6 +92,9 @@ namespace JAOT {
             case TokenKind::Comma:
                 return ",";
 
+            case TokenKind::Dot:
+                return ".";
+
             case TokenKind::Plus:
                 return "+";
 
@@ -316,6 +319,10 @@ namespace JAOT {
 
                 case ',':
                     tokens.push_back({TokenKind::Comma, ",", line, column});
+                    break;
+
+                case '.':
+                    tokens.push_back({TokenKind::Dot, ".", line, column});
                     break;
 
                 case '+':

@@ -22,3 +22,8 @@ void *jaot_allocate(std::size_t size) {
     }
     return memory;
 }
+
+extern "C"
+void jaot_null_dereference() {
+    std::abort();
+}

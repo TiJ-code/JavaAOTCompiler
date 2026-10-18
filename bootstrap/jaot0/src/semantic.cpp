@@ -11,6 +11,14 @@ namespace JAOT {
         using MethodTable = std::unordered_map<std::string, const Method *>;
         using Initialized = std::unordered_set<std::size_t>;
 
+        struct FieldInfo {
+            Type type;
+            std::string className;
+        };
+
+        using FieldTable =
+            std::unordered_map<std::string, std::unordered_map<std::string, FieldInfo>>;
+
         struct Symbol {
             Type type;
             std::size_t id;
@@ -43,9 +51,22 @@ namespace JAOT {
             return nullptr;
         }
 
+        const FieldInfo *findField(
+            const FieldTable &fields,
+            const std::string &className,
+            const std::string &fieldName) {
+            const auto classFields = fields.find(className);
+            if (classFields == fields.end()) {
+                return nullptr;
+            }
+            const auto found = classFields->second.find(fieldName);
+            return found == classFields->second.end() ? nullptr : &found->second;
+        }
+
         std::optional<std::string> referenceClassName(
             const Expr &expression,
-            const Scopes &scopes
+            const Scopes &scopes,
+            const FieldTable &fields
         ) {
             if (expression.kind == ExprKind::NewObject) {
                 return expression.className;
@@ -58,19 +79,33 @@ namespace JAOT {
                 }
             }
 
+            if (expression.kind == ExprKind::FieldAccess && expression.left) {
+                const auto receiverClass =
+                    referenceClassName(*expression.left, scopes, fields);
+                if (receiverClass) {
+                    const FieldInfo *field =
+                        findField(fields, *receiverClass, expression.name);
+                    if (field != nullptr && field->type == Type::Reference) {
+                        return field->className;
+                    }
+                }
+            }
+
             return std::nullopt;
         }
 
         bool referenceAssignableTo(
             const Expr &expression,
             const Scopes &scopes,
+            const FieldTable &fields,
             const std::string &targetClassName
         ) {
             if (expression.kind == ExprKind::Null) {
                 return true;
             }
 
-            const auto sourceClassName = referenceClassName(expression, scopes);
+            const auto sourceClassName =
+                referenceClassName(expression, scopes, fields);
             return sourceClassName.has_value() && *sourceClassName == targetClassName;
         }
 
@@ -78,7 +113,8 @@ namespace JAOT {
             const Expr &expression,
             const Scopes &scopes,
             const Initialized &initialized,
-            const MethodTable &methods
+            const MethodTable &methods,
+            const FieldTable &fields
         ) {
             switch (expression.kind) {
                 case ExprKind::Integer:
@@ -106,11 +142,39 @@ namespace JAOT {
                     return symbol->type;
                 }
 
+                case ExprKind::FieldAccess: {
+                    if (!expression.left) {
+                        semanticError(expression.location, "incomplete field access");
+                    }
+                    const Type receiverType = checkExpression(
+                        *expression.left, scopes, initialized, methods, fields);
+                    if (receiverType != Type::Reference) {
+                        semanticError(
+                            expression.location,
+                            "field access requires a reference receiver");
+                    }
+                    const auto receiverClass =
+                        referenceClassName(*expression.left, scopes, fields);
+                    if (!receiverClass) {
+                        semanticError(
+                            expression.location,
+                            "field access requires a class-typed reference");
+                    }
+                    const FieldInfo *field =
+                        findField(fields, *receiverClass, expression.name);
+                    if (field == nullptr) {
+                        semanticError(
+                            expression.location,
+                            "unknown field: " + expression.name);
+                    }
+                    return field->type;
+                }
+
                 case ExprKind::Binary: {
                     const Type left = checkExpression(
-                        *expression.left, scopes, initialized, methods);
+                        *expression.left, scopes, initialized, methods, fields);
                     const Type right = checkExpression(
-                        *expression.right, scopes, initialized, methods);
+                        *expression.right, scopes, initialized, methods, fields);
 
                     if (expression.op == "+" || expression.op == "-" ||
                         expression.op == "*" || expression.op == "/") {
@@ -134,8 +198,10 @@ namespace JAOT {
 
                     if (expression.op == "==" || expression.op == "!=") {
                         if (left == Type::Reference) {
-                            const auto leftClassName = referenceClassName(*expression.left, scopes);
-                            const auto rightClassName = referenceClassName(*expression.right, scopes);
+                            const auto leftClassName =
+                                referenceClassName(*expression.left, scopes, fields);
+                            const auto rightClassName =
+                                referenceClassName(*expression.right, scopes, fields);
 
                             if (leftClassName.has_value() &&
                                 rightClassName.has_value() &&
@@ -170,7 +236,8 @@ namespace JAOT {
                 }
 
                 case ExprKind::Unary: {
-                    const Type operandType = checkExpression(*expression.operand, scopes, initialized, methods);
+                    const Type operandType = checkExpression(
+                        *expression.operand, scopes, initialized, methods, fields);
 
                     if (operandType != Type::Boolean) {
                         semanticError(expression.location, "logical negation requires a boolean operand");
@@ -190,7 +257,8 @@ namespace JAOT {
                                 *expression.arguments[0],
                                 scopes,
                                 initialized,
-                                methods) != Type::Int) {
+                                methods,
+                                fields) != Type::Int) {
                             semanticError(
                                 expression.arguments[0]->location,
                                 "printInt argument must have type int");
@@ -209,7 +277,8 @@ namespace JAOT {
                                 *expression.arguments[0],
                                 scopes,
                                 initialized,
-                                methods) != Type::Boolean) {
+                                methods,
+                                fields) != Type::Boolean) {
                             semanticError(
                                 expression.arguments[0]->location,
                                 "printBool arguments must have type boolean");
@@ -237,7 +306,8 @@ namespace JAOT {
                             *expression.arguments[i],
                             scopes,
                             initialized,
-                            methods);
+                            methods,
+                            fields);
                         if (argumentType != callee.parameters[i].type) {
                             semanticError(
                                 expression.arguments[i]->location,
@@ -258,6 +328,7 @@ namespace JAOT {
             Flow flow,
             Scopes &scopes,
             const MethodTable &methods,
+            const FieldTable &fields,
             const Method &method,
             std::size_t &nextSymbolId);
 
@@ -266,11 +337,13 @@ namespace JAOT {
             Flow flow,
             Scopes &scopes,
             const MethodTable &methods,
+            const FieldTable &fields,
             const Method &method,
             std::size_t &nextSymbolId) {
             scopes.emplace_back();
             flow = analyzeStatements(
-                statements, std::move(flow), scopes, methods, method, nextSymbolId);
+                statements, std::move(flow), scopes, methods, fields,
+                method, nextSymbolId);
 
             for (const auto &[name, symbol] : scopes.back()) {
                 (void)name;
@@ -285,6 +358,7 @@ namespace JAOT {
             Flow flow,
             Scopes &scopes,
             const MethodTable &methods,
+            const FieldTable &fields,
             const Method &method,
             std::size_t &nextSymbolId
         ) {
@@ -305,11 +379,14 @@ namespace JAOT {
                             *statement.expression,
                             scopes,
                             flow.initialized,
-                            methods);
+                            methods,
+                            fields);
 
                         if (statement.declaredType == Type::Reference) {
                             if (initializerType != Type::Reference ||
-                                !referenceAssignableTo(*statement.expression, scopes, statement.declaredTypeName)) {
+                                !referenceAssignableTo(
+                                    *statement.expression, scopes, fields,
+                                    statement.declaredTypeName)) {
                                 semanticError(
                                     statement.expression->location,
                                     "reference initializer must have type '" +
@@ -340,6 +417,33 @@ namespace JAOT {
                 }
 
                 case StmtKind::Assignment: {
+                    const Type valueType = checkExpression(
+                        *statement.expression, scopes, flow.initialized,
+                        methods, fields);
+
+                    if (statement.assignmentTarget) {
+                        const Type targetType = checkExpression(
+                            *statement.assignmentTarget, scopes,
+                            flow.initialized, methods, fields);
+                        if (targetType == Type::Reference) {
+                            const auto targetClass = referenceClassName(
+                                *statement.assignmentTarget, scopes, fields);
+                            if (!targetClass || valueType != Type::Reference ||
+                                !referenceAssignableTo(
+                                    *statement.expression, scopes, fields,
+                                    *targetClass)) {
+                                semanticError(
+                                    statement.expression->location,
+                                    "reference assignment must match the field type or be null");
+                            }
+                        } else if (valueType != targetType) {
+                            semanticError(
+                                statement.expression->location,
+                                "assignment value must have the same type as its target");
+                        }
+                        return flow;
+                    }
+
                     const Symbol *symbol = findSymbol(scopes, statement.name);
                     if (symbol == nullptr) {
                         semanticError(
@@ -347,12 +451,11 @@ namespace JAOT {
                             "unknown variable: " + statement.name);
                     }
 
-                    const Type valueType = checkExpression(
-                        *statement.expression, scopes, flow.initialized, methods);
-
                     if (symbol->type == Type::Reference) {
                         if (valueType != Type::Reference ||
-                            !referenceAssignableTo(*statement.expression, scopes, symbol->className)) {
+                            !referenceAssignableTo(
+                                *statement.expression, scopes, fields,
+                                symbol->className)) {
                             semanticError(
                                 statement.expression->location,
                                 "reference assignment must have type '" +
@@ -377,7 +480,8 @@ namespace JAOT {
 
                 case StmtKind::Expression:
                     checkExpression(
-                        *statement.expression, scopes, flow.initialized, methods);
+                        *statement.expression, scopes, flow.initialized,
+                        methods, fields);
                     return flow;
 
                 case StmtKind::Return:
@@ -397,7 +501,8 @@ namespace JAOT {
                             *statement.expression,
                             scopes,
                             flow.initialized,
-                            methods);
+                            methods,
+                            fields);
                         if (returnType != method.returnType) {
                             semanticError(
                                 statement.expression->location,
@@ -410,11 +515,12 @@ namespace JAOT {
                 case StmtKind::Block:
                     return analyzeBlock(
                         statement.body, std::move(flow), scopes,
-                        methods, method, nextSymbolId);
+                        methods, fields, method, nextSymbolId);
 
                 case StmtKind::If: {
                     const Type conditionType = checkExpression(
-                        *statement.condition, scopes, flow.initialized, methods);
+                        *statement.condition, scopes, flow.initialized,
+                        methods, fields);
                     if (conditionType != Type::Boolean) {
                         semanticError(
                             statement.condition->location,
@@ -422,12 +528,13 @@ namespace JAOT {
                     }
 
                     Flow thenFlow = analyzeBlock(
-                        statement.body, flow, scopes, methods, method, nextSymbolId);
+                        statement.body, flow, scopes, methods, fields,
+                        method, nextSymbolId);
                     Flow elseFlow = flow;
                     if (statement.hasElse) {
                         elseFlow = analyzeBlock(
                             statement.elseBody, std::move(elseFlow), scopes,
-                            methods, method, nextSymbolId);
+                            methods, fields, method, nextSymbolId);
                     }
 
                     if (thenFlow.fallsThrough && elseFlow.fallsThrough) {
@@ -451,7 +558,8 @@ namespace JAOT {
 
                 case StmtKind::While: {
                     const Type conditionType = checkExpression(
-                        *statement.condition, scopes, flow.initialized, methods);
+                        *statement.condition, scopes, flow.initialized,
+                        methods, fields);
 
                     if (conditionType != Type::Boolean) {
                         semanticError(
@@ -460,7 +568,8 @@ namespace JAOT {
                     }
 
                     (void)analyzeBlock(
-                        statement.body, flow, scopes, methods, method, nextSymbolId);
+                        statement.body, flow, scopes, methods, fields,
+                        method, nextSymbolId);
 
                     return flow;
                 }
@@ -474,17 +583,21 @@ namespace JAOT {
             Flow flow,
             Scopes &scopes,
             const MethodTable &methods,
+            const FieldTable &fields,
             const Method &method,
             std::size_t &nextSymbolId) {
             for (const Stmt &statement : statements) {
                 flow = analyzeStatement(
-                    statement, std::move(flow), scopes, methods,
+                    statement, std::move(flow), scopes, methods, fields,
                     method, nextSymbolId);
             }
             return flow;
         }
 
-        void checkMethod(const Method &method, const MethodTable &methods) {
+        void checkMethod(
+            const Method &method,
+            const MethodTable &methods,
+            const FieldTable &fields) {
             Scopes scopes(1);
             Flow flow;
             std::size_t nextSymbolId = 0;
@@ -502,7 +615,7 @@ namespace JAOT {
             }
 
             flow = analyzeStatements(
-                method.body, std::move(flow), scopes, methods,
+                method.body, std::move(flow), scopes, methods, fields,
                 method, nextSymbolId);
 
             if (method.returnType != Type::Void && flow.fallsThrough) {
@@ -518,6 +631,7 @@ namespace JAOT {
     void SematicAnalyzer::analyze(const Program &program) const {
         std::unordered_set<std::string> classNames;
 
+        FieldTable fields;
         for (const ClassDeclaration &declaration : program.classes) {
             if (!classNames.insert(declaration.name).second) {
                 semanticError(
@@ -560,6 +674,16 @@ namespace JAOT {
                         "unknown field: " + field.typeName
                     );
                 }
+
+                const Type fieldType = field.typeName == "int"
+                    ? Type::Int
+                    : field.typeName == "boolean" ? Type::Boolean : Type::Reference;
+                fields[declaration.name].emplace(
+                    field.name,
+                    FieldInfo{
+                        fieldType,
+                        fieldType == Type::Reference ? field.typeName : ""
+                    });
             }
         }
 
@@ -604,7 +728,7 @@ namespace JAOT {
 
         for (const ClassDeclaration &declaration : program.classes) {
             for (const Method &method : declaration.methods) {
-                checkMethod(method, methods);
+                checkMethod(method, methods, fields);
             }
         }
     }

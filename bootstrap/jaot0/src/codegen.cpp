@@ -107,6 +107,43 @@ namespace JAOT {
                              << "(%rbp)\n";
                         return;
 
+                    case IR::StatementKind::AssignField: {
+                        if (!statement.targetExpression ||
+                            statement.targetExpression->kind != IR::ExprKind::FieldAccess ||
+                            !statement.targetExpression->left ||
+                            !statement.expression) {
+                            throw std::runtime_error("incomplete IR field assignment");
+                        }
+
+                        const IR::Expr &target = *statement.targetExpression;
+                        generateExpression(*target.left);
+
+                        out_ << "    pushq %rax\n";
+                        stackDepth_ += 8;
+
+                        generateExpression(*statement.expression);
+
+                        out_ << (target.type == Type::Reference
+                            ? "    movq %rax, %rdx\n"
+                            : "    movl %eax, %edx\n");
+                        out_ << "    popq %rcx\n";
+                        stackDepth_ -= 8;
+
+                        const std::size_t nullLabel = fieldLabelCounter_++;
+                        out_ << "    testq %rcx, %rcx\n";
+                        out_ << "    jne .Ljaot_" << methodName_ << "_nonnull_" << nullLabel << "\n";
+
+                        emitCall("jaot_null_dereference");
+
+                        out_ << ".Ljaot_" << methodName_ << "_nonnull_" << nullLabel << ":\n";
+                        out_ << (target.type == Type::Reference
+                            ? "    movq %rdx, "
+                            : "    movl %edx, ")
+                            << target.fieldOffset << "(%rcx)\n";
+
+                        return;
+                    }
+
                     case IR::StatementKind::Evaluate:
                         if (!statement.expression) {
                             throw std::runtime_error(
@@ -189,6 +226,34 @@ namespace JAOT {
                                  << "(%rbp), %eax\n";
                         }
                         return;
+
+                    case IR::ExprKind::FieldAccess: {
+                        if (!expression.left) {
+                            throw std::runtime_error(
+                                "incomplete IR field access"
+                            );
+                        }
+
+                        generateExpression(*expression.left);
+
+                        const std::size_t nullLabel = fieldLabelCounter_++;
+
+                        out_ << "    testq %rax, %rax\n";
+                        out_ << "    jne .Ljaot_" << methodName_ << "_nonnull_" << nullLabel << "\n";
+
+                        emitCall("jaot_null_dereference");
+
+                        out_ << ".Ljaot_" << methodName_ << "_nonnull_" << nullLabel << ":\n";
+                        out_ << (expression.type == Type::Reference
+                            ? "    movq "
+                            : "    movl ")
+                            << expression.fieldOffset << "(%rax), "
+                            << (expression.type == Type::Reference
+                                ? "%rax\n"
+                                : "%eax\n");
+
+                        return;
+                    }
 
                     case IR::ExprKind::Unary:
                         if (!expression.operand) {
@@ -422,6 +487,7 @@ namespace JAOT {
             int stackDepth_ = 0;
             std::string methodName_;
             std::size_t divisionLabelCounter_ = 0;
+            std::size_t fieldLabelCounter_ = 0;
         };
     }
 

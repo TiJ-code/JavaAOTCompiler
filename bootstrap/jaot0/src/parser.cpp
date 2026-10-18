@@ -242,10 +242,19 @@ namespace JAOT {
             return statement;
         }
 
-        if (check(TokenKind::Identifier) &&
-            index_ + 1 < tokens_.size() &&
-            tokens_[index_ + 1].kind == TokenKind::Equal) {
-            return parseAssignment();
+        if (check(TokenKind::Identifier)) {
+            std::size_t lookahead = index_ + 1;
+
+            while (lookahead + 1 < tokens_.size() &&
+                   tokens_[lookahead].kind == TokenKind::Dot &&
+                   tokens_[lookahead + 1].kind == TokenKind::Identifier) {
+                lookahead += 2;
+            }
+
+            if (lookahead + 1 < tokens_.size() &&
+                tokens_[lookahead].kind == TokenKind::Equal) {
+                return parseAssignment();
+            }
         }
 
         if (check(TokenKind::Identifier) &&
@@ -289,17 +298,38 @@ namespace JAOT {
     }
 
     Stmt Parser::parseAssignment() {
-        const auto &name = consume(TokenKind::Identifier, "expected variable name in assignment");
+        const Token identifier = consume(TokenKind::Identifier, "expected variable name in assignment");
 
-        consume(TokenKind::Equal, "expected '=' in assignment");
+        auto target = std::make_unique<Expr>();
+        target->kind = ExprKind::Variable;
+        target->name = identifier.text;
+        target->location = { .line = identifier.line, .column = identifier.column };
+
+        while (match(TokenKind::Dot)) {
+            const Token field = consume(TokenKind::Identifier, "expected field name after '.'");
+
+            auto access = std::make_unique<Expr>();
+            access->kind = ExprKind::FieldAccess;
+            access->name = field.text;
+            access->location = { .line = field.line, .column = identifier.column };
+            access->left = std::move(target);
+            target = std::move(access);
+        }
 
         Stmt statement;
         statement.kind = StmtKind::Assignment;
-        statement.name = name.text;
         statement.location = {
-            .line = name.line,
-            .column = name.column
+            .line = identifier.line,
+            .column = identifier.column
         };
+
+        if (target->kind == ExprKind::Variable) {
+            statement.name = target->name;
+        } else {
+            statement.assignmentTarget = std::move(target);
+        }
+
+        consume(TokenKind::Equal, "expected '=' in assignment");
         statement.expression = parseExpression();
 
         consume(TokenKind::Semicolon, "expected ';' after assignment");
@@ -453,80 +483,95 @@ namespace JAOT {
     }
 
     std::unique_ptr<Expr> Parser::parsePrimary() {
+        std::unique_ptr<Expr> expression;
+
         if (match(TokenKind::Integer)) {
-            const auto &token = previous();
-            auto expression = std::make_unique<Expr>();
+            const Token &token = previous();
+
+            expression = std::make_unique<Expr>();
             expression->kind = ExprKind::Integer;
             expression->integer = parseIntegerLiteral(token);
             expression->location = {token.line, token.column};
-            return expression;
-        }
+        } else if (match(TokenKind::KwTrue) || match(TokenKind::KwFalse)) {
+            const Token &token = previous();
 
-        if (match(TokenKind::KwTrue) || match(TokenKind::KwFalse)) {
-            const auto &token = previous();
-            auto expression = std::make_unique<Expr>();
+            expression = std::make_unique<Expr>();
             expression->kind = ExprKind::Boolean;
             expression->boolean = token.kind == TokenKind::KwTrue;
             expression->location = {token.line, token.column};
-            return expression;
-        }
-
-        if (match(TokenKind::KwNull)) {
+        } else if (match(TokenKind::KwNull)) {
             const Token &token = previous();
-            auto expression = std::make_unique<Expr>();
+
+            expression = std::make_unique<Expr>();
             expression->kind = ExprKind::Null;
             expression->location = {.line = token.line, .column = token.column};
-            return expression;
-        }
-
-        if (match(TokenKind::KwNew)) {
+        } else if (match(TokenKind::KwNew)) {
             const Token &newToken = previous();
             const Token &className = consume(TokenKind::Identifier, "expected class name after 'new'");
             consume(TokenKind::LParen, "expected '(' after class name");
             consume(TokenKind::RParen, "expected ')' after constructor arguments");
 
-            auto expression = std::make_unique<Expr>();
+            expression = std::make_unique<Expr>();
             expression->kind = ExprKind::NewObject;
             expression->className = className.text;
             expression->location = {.line = newToken.line, .column = newToken.column};
-            return expression;
-        }
-
-        if (match(TokenKind::Identifier)) {
+        } else if (match(TokenKind::Identifier)) {
             const Token identifier = previous();
-            if (!match(TokenKind::LParen)) {
-                auto expression = std::make_unique<Expr>();
+
+            if (match(TokenKind::LParen)) {
+                expression = std::make_unique<Expr>();
+                expression->kind = ExprKind::Call;
+                expression->callee = identifier.text;
+                expression->location = {identifier.line, identifier.column};
+
+                if (!check(TokenKind::RParen)) {
+                    while (true) {
+                        expression->arguments.push_back(parseExpression());
+                        if (!match(TokenKind::Comma)) {
+                            break;
+                        }
+                    }
+                }
+
+                consume(TokenKind::RParen, "expected ')' after arguments");
+            } else {
+                expression = std::make_unique<Expr>();
                 expression->kind = ExprKind::Variable;
                 expression->name = identifier.text;
                 expression->location = {identifier.line, identifier.column};
-                return expression;
             }
-
-            auto expression = std::make_unique<Expr>();
-            expression->kind = ExprKind::Call;
-            expression->callee = identifier.text;
-            expression->location = {identifier.line, identifier.column};
-
-            if (!check(TokenKind::RParen)) {
-                while (true) {
-                    expression->arguments.push_back(parseExpression());
-                    if (!match(TokenKind::Comma)) {
-                        break;
-                    }
-                }
-            }
-
-            consume(TokenKind::RParen, "expected ')' after arguments");
-            return expression;
-        }
-
-        if (match(TokenKind::LParen)) {
-            auto expression = parseExpression();
+        } else if (match(TokenKind::LParen)) {
+            expression = parseExpression();
             consume(TokenKind::RParen, "expected ')' after expression");
+
+            while (match(TokenKind::Dot)) {
+                const Token field = consume(TokenKind::Identifier, "expected field name after '.'");
+
+                auto access = std::make_unique<Expr>();
+                access->kind = ExprKind::FieldAccess;
+                access->name = field.text;
+                access->location = {field.line, field.column};
+                access->left = std::move(expression);
+                expression = std::move(access);
+            }
+
             return expression;
+        } else {
+            error("expected expression");
         }
 
-        error("expected expression");
+        while (match(TokenKind::Dot)) {
+            const Token field = consume(TokenKind::Identifier, "expected field name after '.'");
+
+            auto access = std::make_unique<Expr>();
+            access->kind = ExprKind::FieldAccess;
+            access->name = field.text;
+            access->location = {field.line, field.column};
+            access->left = std::move(expression);
+            expression = std::move(access);
+        }
+
+        return expression;
     }
 
     std::unique_ptr<Expr> Parser::parseLogicalOr() {
