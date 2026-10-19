@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <string>
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace JAOT::IR {
@@ -25,7 +26,7 @@ namespace JAOT::IR {
 
     struct Expr {
         ExprKind kind;
-        Type type;
+        TypeRef type;
         SourceLocation location {};
 
         std::int64_t integer = 0;
@@ -36,8 +37,10 @@ namespace JAOT::IR {
 
         std::string binaryOperator;
         std::string unaryOperator;
-        std::string callee;
-        std::string calleeClass;
+
+        MethodSignature callee;
+
+        std::unique_ptr<Expr> receiver;
 
         std::vector<std::unique_ptr<Expr>> arguments;
         std::unique_ptr<Expr> left;
@@ -48,8 +51,7 @@ namespace JAOT::IR {
     struct Local {
         LocalId id;
         std::string name;
-        Type type;
-        std::string className;
+        TypeRef type;
         bool isParameter;
     };
 
@@ -93,6 +95,7 @@ namespace JAOT::IR {
 
     struct Method {
         MethodSignature signature;
+        std::optional<LocalId> receiver;
         std::vector<LocalId> parameters;
         std::vector<Local> locals;
         std::vector<BasicBlock> blocks;
@@ -100,13 +103,15 @@ namespace JAOT::IR {
 
     struct Field {
         std::string name;
-        std::string typeName;
+        TypeRef type;
         std::size_t offset = 0;
+        std::size_t size = 0;
     };
 
     struct Class {
         std::string name;
         std::vector<Field> fields;
+        std::size_t size = 0;
     };
 
     struct Program {

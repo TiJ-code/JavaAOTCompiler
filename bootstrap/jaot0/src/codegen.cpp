@@ -20,8 +20,8 @@ namespace JAOT {
             FunctionGenerator(
                     std::ostream &out,
                     const std::unordered_map<std::string, MethodSignature> &methods,
-                    const std::unordered_map<std::string, std::size_t> &classSizes
-            ) : out_(out), methods_(methods), classSizes_(classSizes) {
+                    const std::unordered_map<std::string, IR::Class> &classes
+            ) : out_(out), methods_(methods), classes_(classes) {
             }
 
             void generate(const IR::Method &method) {
@@ -49,7 +49,7 @@ namespace JAOT {
 
                 for (std::size_t i = 0; i < method.parameters.size(); ++i) {
                     const IR::LocalId parameter = method.parameters[i];
-                    if (localType(parameter) == Type::Reference) {
+                    if (localType(parameter).kind == Type::Reference) {
                         out_ << "    movq " << ArgumentRegisters[i] << ", "
                              << localOffset(parameter) << "(%rbp)\n";
                     } else {
@@ -71,8 +71,8 @@ namespace JAOT {
             }
 
         private:
-            static int localSize(Type type) {
-                return type == Type::Reference ? 8 : 4;
+            static int localSize(const TypeRef &type) {
+                return type.kind == Type::Reference ? 8 : 4;
             }
 
             void collectLocals(const IR::Method &method) {
@@ -102,7 +102,7 @@ namespace JAOT {
                                 "IR local assignment without value");
                         }
                         generateExpression(*statement.expression);
-                        out_ << (localType(statement.target) == Type::Reference
+                        out_ << (localType(statement.target).kind == Type::Reference
                                      ? "    movq %rax, "
                                      : "    movl %eax, ")
                              << localOffset(statement.target)
@@ -125,7 +125,7 @@ namespace JAOT {
 
                         generateExpression(*statement.expression);
 
-                        out_ << (target.type == Type::Reference
+                        out_ << (target.type.kind == Type::Reference
                             ? "    movq %rax, %rdx\n"
                             : "    movl %eax, %edx\n");
                         out_ << "    popq %rcx\n";
@@ -138,7 +138,7 @@ namespace JAOT {
                         emitCall("jaot_null_dereference");
 
                         out_ << ".Ljaot_" << methodName_ << "_nonnull_" << nullLabel << ":\n";
-                        out_ << (target.type == Type::Reference
+                        out_ << (target.type.kind == Type::Reference
                             ? "    movq %rdx, "
                             : "    movl %edx, ")
                             << target.fieldOffset << "(%rcx)\n";
@@ -206,19 +206,20 @@ namespace JAOT {
                         return;
 
                     case IR::ExprKind::NewObject: {
-                        const auto classSize = classSizes_.find(expression.className);
-                        if (classSize == classSizes_.end()) {
+                        const auto classFound = classes_.find(expression.className);
+                        if (classFound == classes_.end()) {
                             throw std::runtime_error(
                                 "unknown class: " + expression.className
                             );
                         }
-                        out_ << "    movq $" << classSize->second << ", %rdi\n";
+                        out_ << "    movq $" << classFound->second.size
+                             << ", %rdi\n";
                         emitCall("jaot_allocate");
                         return;
                     }
 
                     case IR::ExprKind::Local:
-                        if (expression.type == Type::Reference) {
+                        if (expression.type.kind == Type::Reference) {
                             out_ << "    movq " << localOffset(expression.local)
                                  << "(%rbp), %rax\n";
                         } else {
@@ -244,11 +245,11 @@ namespace JAOT {
                         emitCall("jaot_null_dereference");
 
                         out_ << ".Ljaot_" << methodName_ << "_nonnull_" << nullLabel << ":\n";
-                        out_ << (expression.type == Type::Reference
+                        out_ << (expression.type.kind == Type::Reference
                             ? "    movq "
                             : "    movl ")
                             << expression.fieldOffset << "(%rax), "
-                            << (expression.type == Type::Reference
+                            << (expression.type.kind == Type::Reference
                                 ? "%rax\n"
                                 : "%eax\n");
 
@@ -331,7 +332,7 @@ namespace JAOT {
                 stackDepth_ += 8;
 
                 generateExpression(*expression.right);
-                if (expression.left->type == Type::Reference) {
+                if (expression.left->type.kind == Type::Reference) {
                     out_ << "    movq %rax, %rcx\n";
                 } else {
                     out_ << "    movl %eax, %ecx\n";
@@ -382,7 +383,7 @@ namespace JAOT {
                         throw std::runtime_error("unknown IR binary operator");
                     }();
 
-                    if (expression.left->type == Type::Reference) {
+                    if (expression.left->type.kind == Type::Reference) {
                         out_ << "    cmpq %rcx, %rax\n";
                     } else {
                         out_ << "    cmpl %ecx, %eax\n";
@@ -393,47 +394,41 @@ namespace JAOT {
             }
 
             void generateCall(const IR::Expr &expression) {
-                if (expression.callee == "printInt") {
+                if (expression.callee.ownerClass == "<runtime>") {
                     if (expression.arguments.size() != 1) {
                         throw std::runtime_error(
-                            "printInt expects one argument");
+                            expression.callee.name + " expects one argument");
                     }
 
                     generateExpression(*expression.arguments[0]);
                     out_ << "    movl %eax, %edi\n";
-                    emitCall("jaot_print_int");
+                    emitCall(
+                        expression.callee.name == "printInt"
+                            ? "jaot_print_int"
+                            : "jaot_print_bool");
                     return;
                 }
 
-                if (expression.callee == "printBool") {
-                    if (expression.arguments.size() != 1) {
-                        throw std::runtime_error(
-                            "printBool expects one argument");
-                    }
-
-                    generateExpression(*expression.arguments[0]);
-                    out_ << "    movl %eax, %edi\n";
-                    emitCall("jaot_print_bool");
-                    return;
-                }
-
-                const std::string owner = expression.calleeClass.empty()
-                    ? currentClass_
-                    : expression.calleeClass;
                 const auto method = methods_.find(
-                    owner + "." + expression.callee);
+                    expression.callee.ownerClass + "." +
+                    expression.callee.name);
                 if (method == methods_.end()) {
                     throw std::runtime_error(
-                        "unknown function: " + expression.callee);
+                        "unknown function: " + expression.callee.ownerClass +
+                        "." + expression.callee.name);
                 }
 
                 if (expression.arguments.size() !=
                     method->second.parameterTypes.size()) {
                     throw std::runtime_error(
-                        "function " + expression.callee + " expects " +
-                        std::to_string(
-                            method->second.parameterTypes.size()) +
+                        "function " + expression.callee.name + " expects " +
+                        std::to_string(method->second.parameterTypes.size()) +
                         " arguments");
+                }
+
+                if (expression.receiver) {
+                    throw std::runtime_error(
+                        "instance method calls are not supported by JAOT0");
                 }
 
                 if (expression.arguments.size() > ArgumentRegisters.size()) {
@@ -455,7 +450,7 @@ namespace JAOT {
                 emitCall("jaot_" + methodSymbol(method->second));
             }
 
-            void emitCall(const std::string &name) {
+            void emitCall(const std::string &name) const {
                 const bool needsPadding = stackDepth_ % 16 != 0;
                 if (needsPadding) {
                     out_ << "    subq $8, %rsp\n";
@@ -477,7 +472,7 @@ namespace JAOT {
                 return found->second;
             }
 
-            Type localType(IR::LocalId id) const {
+            TypeRef localType(IR::LocalId id) const {
                 const auto found = localTypes_.find(id);
                 if (found == localTypes_.end()) {
                     throw std::runtime_error("unknown IR local id");
@@ -487,9 +482,9 @@ namespace JAOT {
 
             std::ostream &out_;
             const std::unordered_map<std::string, MethodSignature> &methods_;
-            const std::unordered_map<std::string, std::size_t> &classSizes_;
+            const std::unordered_map<std::string, IR::Class> &classes_;
             std::unordered_map<IR::LocalId, int> locals_;
-            std::unordered_map<IR::LocalId, Type> localTypes_;
+            std::unordered_map<IR::LocalId, TypeRef> localTypes_;
             int stackSize_ = 0;
             int stackDepth_ = 0;
             std::string methodName_;
@@ -503,15 +498,14 @@ namespace JAOT {
         out << "# generated by jaot0\n\n";
 
         std::unordered_map<std::string, MethodSignature> methods;
-        std::unordered_map<std::string, std::size_t> classSizes;
+        std::unordered_map<std::string, IR::Class> classes;
         for (const IR::Class &classDeclaration : program.classes) {
-            std::size_t size = 0;
-            for (const IR::Field &field : classDeclaration.fields) {
-                size += field.typeName == "int" || field.typeName == "boolean"
-                    ? 4
-                    : 8;
+            if (!classes.emplace(
+                    classDeclaration.name,
+                    classDeclaration).second) {
+                throw std::runtime_error(
+                    "duplicate class: " + classDeclaration.name);
             }
-            classSizes.emplace(classDeclaration.name, size);
         }
 
         for (const IR::Method &method : program.methods) {
@@ -526,7 +520,7 @@ namespace JAOT {
         }
 
         for (const IR::Method &method : program.methods) {
-            FunctionGenerator generator(out, methods, classSizes);
+            FunctionGenerator generator(out, methods, classes);
             generator.generate(method);
             out << '\n';
         }

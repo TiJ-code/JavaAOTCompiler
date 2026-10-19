@@ -90,13 +90,21 @@ int main() {
         require(ir.classes[0].fields.size() == 3,
             "IR Node should have three fields");
         require(ir.classes[0].fields[0].name == "value" &&
-                ir.classes[0].fields[0].typeName == "int",
+                ir.classes[0].fields[0].type.kind == JAOT::Type::Int &&
+                ir.classes[0].fields[0].offset == 0 &&
+                ir.classes[0].fields[0].size == 4,
             "first IR Node field should be int value");
         require(ir.classes[0].fields[1].name == "marked" &&
-                ir.classes[0].fields[1].typeName == "boolean",
+                ir.classes[0].fields[1].type.kind == JAOT::Type::Boolean &&
+                ir.classes[0].fields[1].offset == 4 &&
+                ir.classes[0].fields[1].size == 4,
             "second IR Node field should be boolean marked");
         require(ir.classes[0].fields[2].name == "next" &&
-                ir.classes[0].fields[2].typeName == "Link",
+                ir.classes[0].fields[2].type.kind == JAOT::Type::Reference &&
+                ir.classes[0].fields[2].type.className == "Link" &&
+                ir.classes[0].fields[2].offset == 8 &&
+                ir.classes[0].fields[2].size == 8 &&
+                ir.classes[0].size == 16,
             "third IR Node field should be Link next");
 
         require(ir.classes[1].name == "Main" &&
@@ -106,7 +114,10 @@ int main() {
         require(ir.classes[2].name == "Link" &&
                 ir.classes[2].fields.size() == 1 &&
                 ir.classes[2].fields[0].name == "previous" &&
-                ir.classes[2].fields[0].typeName == "Node",
+                ir.classes[2].fields[0].type.kind == JAOT::Type::Reference &&
+                ir.classes[2].fields[0].type.className == "Node" &&
+                ir.classes[2].fields[0].size == 8 &&
+                ir.classes[2].size == 8,
             "IR Link should have a Node reference field");
 
         require(ir.methods.size() == 2,
@@ -181,7 +192,10 @@ int main() {
             "assignment value should be a call");
 
         const JAOT::IR::Expr &call = *assignment.expression;
-        require(call.callee == "add" &&
+        require(call.callee.name == "add" &&
+            call.callee.ownerClass == "Main" &&
+            call.callee.returnType.kind == JAOT::Type::Int &&
+            call.callee.parameterTypes.size() == 2 &&
             call.arguments.size() == 2,
             "assignment should call 'add' with two arguments");
         require(call.arguments[0]->kind == JAOT::IR::ExprKind::Integer,
@@ -198,7 +212,9 @@ int main() {
             "second 'main' statement should be an expression");
         require(printStatement.expression &&
             printStatement.expression->kind == JAOT::IR::ExprKind::Call &&
-            printStatement.expression->callee == "printInt",
+            printStatement.expression->callee.name == "printInt" &&
+            printStatement.expression->callee.ownerClass == "<runtime>" &&
+            printStatement.expression->type.kind == JAOT::Type::Void,
             "second 'main' statement should call 'printInt'");
         require(printStatement.expression->arguments.size() == 1 &&
             printStatement.expression->arguments[0]->kind == JAOT::IR::ExprKind::Local &&

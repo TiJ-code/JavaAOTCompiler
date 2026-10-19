@@ -47,9 +47,8 @@ namespace JAOT {
                     const IR::LocalId id =
                         addLocal(
                             parameter.name,
-                            parameter.type.kind,
-                            true,
-                            parameter.type.className);
+                            parameter.type,
+                            true);
                     result_.parameters.push_back(id);
                 }
 
@@ -98,13 +97,13 @@ namespace JAOT {
 
             IR::LocalId addLocal(
                 const std::string &name,
-                Type type,
-                bool isParameter,
-                const std::string &className = {}
+                TypeRef type,
+                bool isParameter
             ) {
                 if (scopes_.back().contains(name)) {
                     loweringError("duplicate local: " + name);
                 }
+
                 if (result_.locals.size() >
                     std::numeric_limits<IR::LocalId>::max()) {
                     loweringError(
@@ -114,14 +113,15 @@ namespace JAOT {
 
                 const auto id =
                     static_cast<IR::LocalId>(result_.locals.size());
+
                 scopes_.back().emplace(name, id);
                 result_.locals.push_back({
                     .id = id,
                     .name = name,
-                    .type = type,
-                    .className = className,
+                    .type = std::move(type),
                     .isParameter = isParameter
                 });
+
                 return id;
             }
 
@@ -135,18 +135,35 @@ namespace JAOT {
                 loweringError("unresolved local: " + name);
             }
 
-            [[nodiscard]] Type localType(IR::LocalId id) const {
+            [[nodiscard]] TypeRef localType(IR::LocalId id) const {
                 if (id >= result_.locals.size()) {
                     loweringError("invalid local id");
                 }
                 return result_.locals[id].type;
             }
 
-            [[nodiscard]] const std::string &localClassName(IR::LocalId id) const {
-                if (id >= result_.locals.size()) {
-                    loweringError("invalid local id");
+            [[nodiscard]] std::optional<IR::LocalId> findLocalIfPresent(
+                const std::string &name
+            ) const {
+                for (auto scope = scopes_.rbegin(); scope != scopes_.rend(); ++scope) {
+                    const auto found = scope->find(name);
+                    if (found != scope->end()) {
+                        return found->second;
+                    }
                 }
-                return result_.locals[id].className;
+                return std::nullopt;
+            }
+
+            static void requireAssignable(
+                const TypeRef &source,
+                const TypeRef &target,
+                const std::string &context
+            ) {
+                if (!isAssignable(source, target)) {
+                    loweringError(
+                        "cannot assign " + typeName(source) + " to " +
+                        typeName(target) + " in " + context);
+                }
             }
 
             std::unique_ptr<IR::Expr> lowerExpression(const Expr &expression) {
@@ -156,19 +173,19 @@ namespace JAOT {
                 switch (expression.kind) {
                     case ExprKind::Integer:
                         lowered->kind = IR::ExprKind::Integer;
-                        lowered->type = Type::Int;
+                        lowered->type = TypeRef{Type::Int, {}};
                         lowered->integer = expression.integer;
                         return lowered;
 
                     case ExprKind::Boolean:
                         lowered->kind = IR::ExprKind::Boolean;
-                        lowered->type = Type::Boolean;
+                        lowered->type = TypeRef{Type::Boolean, {}};
                         lowered->boolean = expression.boolean;
                         return lowered;
 
                     case ExprKind::Null:
                         lowered->kind = IR::ExprKind::Null;
-                        lowered->type = Type::Reference;
+                        lowered->type = TypeRef{Type::Reference, {}};
                         return lowered;
 
                     case ExprKind::NewObject:
@@ -177,7 +194,8 @@ namespace JAOT {
                                 "unknown class: " + expression.className);
                         }
                         lowered->kind = IR::ExprKind::NewObject;
-                        lowered->type = Type::Reference;
+                        lowered->type =
+                            TypeRef{Type::Reference, expression.className};
                         lowered->className = expression.className;
                         return lowered;
 
@@ -185,7 +203,9 @@ namespace JAOT {
                         lowered->kind = IR::ExprKind::Local;
                         lowered->local = findLocal(expression.name);
                         lowered->type = localType(lowered->local);
-                        lowered->className = localClassName(lowered->local);
+                        if (lowered->type.kind == Type::Reference) {
+                            lowered->className = lowered->type.className;
+                        }
                         return lowered;
 
                     case ExprKind::FieldAccess: {
@@ -196,14 +216,17 @@ namespace JAOT {
                         lowered->kind = IR::ExprKind::FieldAccess;
                         lowered->left = lowerExpression(*expression.left);
 
-                        if (lowered->left->type != Type::Reference) {
+                        if (lowered->left->type.kind != Type::Reference) {
                             loweringError("field receiver is not a reference");
                         }
 
-                        const auto classFields = classFields_.find(lowered->left->className);
+                        const auto classFields =
+                            classFields_.find(lowered->left->type.className);
 
                         if (classFields == classFields_.end()) {
-                            loweringError("unknown class: " + lowered->left->className);
+                            loweringError(
+                                "unknown class: " +
+                                lowered->left->type.className);
                         }
 
                         const auto field = std::ranges::find_if(
@@ -213,15 +236,17 @@ namespace JAOT {
                             }
                         );
 
-                        lowered->fieldOffset = field->offset;
+                        if (field == classFields->second.end()) {
+                            loweringError(
+                                "unknown field '" + expression.name +
+                                "' in class " +
+                                lowered->left->type.className);
+                        }
 
-                        if (field->typeName == "int") {
-                            lowered->type = Type::Int;
-                        } else if (field->typeName == "boolean") {
-                            lowered->type = Type::Boolean;
-                        } else {
-                            lowered->type = Type::Reference;
-                            lowered->className = field->typeName;
+                        lowered->fieldOffset = field->offset;
+                        lowered->type = field->type;
+                        if (lowered->type.kind == Type::Reference) {
+                            lowered->className = lowered->type.className;
                         }
 
                         return lowered;
@@ -232,44 +257,141 @@ namespace JAOT {
                         lowered->binaryOperator = expression.op;
                         lowered->left = lowerExpression(*expression.left);
                         lowered->right = lowerExpression(*expression.right);
+
+                        if (expression.op == "+" || expression.op == "-" ||
+                            expression.op == "*" || expression.op == "/") {
+                            if (lowered->left->type.kind != Type::Int ||
+                                lowered->right->type.kind != Type::Int) {
+                                loweringError(
+                                    "arithmetic operators require integer operands");
+                            }
+                        } else if (lowered->left->type.kind !=
+                                       lowered->right->type.kind) {
+                            loweringError(
+                                "comparison operands must have compatible types");
+                        }
+
                         lowered->type =
                             expression.op == "+" || expression.op == "-" ||
                             expression.op == "*" || expression.op == "/"
-                                ? Type::Int
-                                : Type::Boolean;
+                                ? TypeRef{Type::Int, {}}
+                                : TypeRef{Type::Boolean, {}};
                         return lowered;
 
                     case ExprKind::Unary:
                         lowered->kind = IR::ExprKind::Unary;
                         lowered->unaryOperator = expression.op;
                         lowered->operand = lowerExpression(*expression.operand);
-                        lowered->type = Type::Boolean;
+                        if (expression.op == "!" &&
+                            lowered->operand->type.kind != Type::Boolean) {
+                            loweringError(
+                                "logical negation requires a boolean operand");
+                        }
+                        lowered->type = TypeRef{Type::Boolean, {}};
                         return lowered;
 
                     case ExprKind::Call: {
                         lowered->kind = IR::ExprKind::Call;
-                        lowered->callee = expression.callee;
-                        lowered->calleeClass = expression.calleeClass;
+
                         if (expression.callee == "printInt" ||
                             expression.callee == "printBool") {
-                            lowered->type = Type::Void;
+                            lowered->callee = MethodSignature{
+                                .name = expression.callee,
+                                .ownerClass = "<runtime>",
+                                .returnType = TypeRef{Type::Void, {}},
+                                .parameterTypes = {
+                                    TypeRef{
+                                        expression.callee == "printInt"
+                                            ? Type::Int
+                                            : Type::Boolean,
+                                        {}
+                                    }
+                                }
+                            };
                         } else {
-                            const std::string owner = expression.calleeClass.empty()
-                                ? currentClass_
-                                : expression.calleeClass;
+                            std::string owner = currentClass_;
+
+                            if (!expression.calleeClass.empty()) {
+                                const auto receiver =
+                                    findLocalIfPresent(expression.calleeClass);
+
+                                if (receiver) {
+                                    const TypeRef receiverType =
+                                        localType(*receiver);
+                                    if (receiverType.kind != Type::Reference) {
+                                        loweringError(
+                                            "call receiver is not a reference");
+                                    }
+
+                                    owner = receiverType.className;
+                                    lowered->receiver =
+                                        std::make_unique<IR::Expr>();
+                                    lowered->receiver->kind =
+                                        IR::ExprKind::Local;
+                                    lowered->receiver->local = *receiver;
+                                    lowered->receiver->type = receiverType;
+                                    lowered->receiver->className =
+                                        receiverType.className;
+                                } else if (!classNames_.contains(
+                                               expression.calleeClass)) {
+                                    loweringError(
+                                        "unknown call receiver: " +
+                                        expression.calleeClass);
+                                } else {
+                                    owner = expression.calleeClass;
+                                }
+                            }
+
                             const auto found =
                                 returnTypes_.find(owner + "." + expression.callee);
                             if (found == returnTypes_.end()) {
                                 loweringError(
-                                    "unresolved function: " + expression.callee);
+                                    "unresolved function: " +
+                                    owner + "." + expression.callee);
                             }
-                                    lowered->type = found->second.returnType.kind;
-                                    lowered->className = found->second.returnType.className;
+
+                            lowered->callee = found->second;
                         }
+
                         for (const auto &argument : expression.arguments) {
                             lowered->arguments.push_back(
                                 lowerExpression(*argument));
                         }
+
+                        lowered->type = lowered->callee.returnType;
+
+                        if (lowered->callee.ownerClass != "<runtime>" &&
+                            lowered->arguments.size() !=
+                                lowered->callee.parameterTypes.size()) {
+                            loweringError(
+                                "wrong argument count for " +
+                                lowered->callee.ownerClass + "." +
+                                lowered->callee.name);
+                        }
+
+                        if (lowered->callee.ownerClass != "<runtime>") {
+                            for (std::size_t i = 0;
+                                 i < lowered->arguments.size();
+                                 ++i) {
+                                requireAssignable(
+                                    lowered->arguments[i]->type,
+                                    lowered->callee.parameterTypes[i],
+                                    lowered->callee.ownerClass + "." +
+                                        lowered->callee.name);
+                            }
+                        } else {
+                            requireAssignable(
+                                lowered->arguments.front()->type,
+                                lowered->callee.parameterTypes.front(),
+                                lowered->callee.name);
+                        }
+
+                        if (lowered->callee.ownerClass == "<runtime>" &&
+                            lowered->arguments.size() != 1) {
+                            loweringError(
+                                expression.callee + " expects one argument");
+                        }
+
                         return lowered;
                     }
                 }
@@ -311,13 +433,16 @@ namespace JAOT {
                         std::unique_ptr<IR::Expr> initializer;
                         if (statement.expression) {
                             initializer = lowerExpression(*statement.expression);
+                            requireAssignable(
+                                initializer->type,
+                                statement.declaredType,
+                                "initializer for " + statement.name);
                         }
 
                         const IR::LocalId id = addLocal(
                             statement.name,
-                            statement.declaredType.kind,
-                            false,
-                            statement.declaredType.className
+                            statement.declaredType,
+                            false
                         );
 
                         if (initializer) {
@@ -338,6 +463,10 @@ namespace JAOT {
                             assignment.location = statement.location;
                             assignment.targetExpression = lowerExpression(*statement.assignmentTarget);
                             assignment.expression = lowerExpression(*statement.expression);
+                            requireAssignable(
+                                assignment.expression->type,
+                                assignment.targetExpression->type,
+                                "field assignment");
                             appendStatement(std::move(assignment));
                             return;
                         }
@@ -347,6 +476,10 @@ namespace JAOT {
                         assignment.location = statement.location;
                         assignment.target = findLocal(statement.name);
                         assignment.expression = lowerExpression(*statement.expression);
+                        requireAssignable(
+                            assignment.expression->type,
+                            localType(assignment.target),
+                            "assignment to " + statement.name);
                         appendStatement(std::move(assignment));
                         return;
                     }
@@ -368,6 +501,10 @@ namespace JAOT {
                         if (statement.expression) {
                             terminator.expression =
                                 lowerExpression(*statement.expression);
+                            requireAssignable(
+                                terminator.expression->type,
+                                result_.signature.returnType,
+                                "return from " + result_.signature.name);
                         }
                         currentBlock_.reset();
                         return;
@@ -509,19 +646,16 @@ namespace JAOT {
             for (const Field &field : declaration.fields) {
                 irClass.fields.push_back({
                     .name = field.name,
-                    .typeName = field.type.kind == Type::Int
-                        ? "int"
-                        : field.type.kind == Type::Boolean
-                            ? "boolean"
-                            : field.type.className,
-                    .offset = offset
+                    .type = field.type,
+                    .offset = offset,
+                    .size = field.type.kind == Type::Reference
+                        ? std::size_t{8}
+                        : std::size_t{4}
                 });
-                offset += field.type.kind == Type::Int ||
-                    field.type.kind == Type::Boolean
-                    ? 4
-                    : 8;
+                offset += irClass.fields.back().size;
             }
 
+            irClass.size = offset;
             classFields.emplace(declaration.name, irClass.fields);
             result.classes.push_back(std::move(irClass));
         }
