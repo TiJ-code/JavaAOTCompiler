@@ -19,6 +19,8 @@ add_executable(jaot0
         bootstrap/jaot0/include/jaot/ir_lowering.h
         bootstrap/jaot0/src/ir_lowering.cpp
         bootstrap/jaot0/include/jaot/types.h
+        bootstrap/jaot0/include/jaot/ir_validator.h
+        bootstrap/jaot0/src/ir_validator.cpp
 )
 
 target_sources(jaot0

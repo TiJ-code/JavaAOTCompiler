@@ -2,40 +2,6 @@
 <project version="4">
   <component name="CidrCTestProjectState">
     <ctestState>
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_assignment" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_assignment_unknown_variable" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_boolean_assignment" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_comments" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_comparison_operators" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_declaration_assignment" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_division" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_division_by_zero" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_functions" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_hello" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_help" value="107" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_if_else" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_integer_bounds" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_integer_too_large" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_integer_too_small" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_invalid_main_signature" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_ir_header" value="103" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_ir_lowering" value="104" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_language_example" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_logical_operators" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_logical_short_circuit" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_missing" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_missing_main" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_missing_return" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_object_class_layout" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_object_expression_syntax" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_object_field_access" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_object_method_references" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_object_reference_local" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_object_reference_type_mismatch" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_print_bool" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_uninitialized_variable" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot0_while_loop" value="168" />
-      <lineNumber testId="path:CMakeLists.txt test:jaot_runtime" value="105" />
       <lineNumber testId="path:null test:jaot0_compile_assignment" value="130" />
       <lineNumber testId="path:null test:jaot0_compile_comments" value="244" />
       <lineNumber testId="path:null test:jaot0_compile_declaration_assignment" value="158" />

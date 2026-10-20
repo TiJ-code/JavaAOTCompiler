@@ -5,7 +5,7 @@
 namespace JAOT {
     class SematicAnalyzer {
     public:
-        static void analyze(const Program &program) ;
+        void analyze(const Program &program) ;
 
     private:
         struct AnalysisContext;

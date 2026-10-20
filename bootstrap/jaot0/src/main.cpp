@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <string>
 
+#include "jaot/ir_validator.h"
 #include "jaot/semantic.h"
 
 namespace {
@@ -105,6 +106,8 @@ int main(int argc, char **argv)
 
         JAOT::IrLowerer irLowerer;
         const JAOT::IR::Program irProgram = irLowerer.lower(program);
+
+        JAOT::IrValidator::validate(irProgram);
 
         if (outputPath.empty()) {
             outputPath = inputPath + ".s";
