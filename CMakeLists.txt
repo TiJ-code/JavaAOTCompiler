@@ -23,6 +23,8 @@ add_executable(jaot0
         bootstrap/jaot0/src/ir_validator.cpp
         bootstrap/jaot0/include/jaot/frame.h
         bootstrap/jaot0/src/frame.cpp
+        bootstrap/jaot0/src/machine.cpp
+        bootstrap/jaot0/include/jaot/machine.h
 )
 
 target_sources(jaot0

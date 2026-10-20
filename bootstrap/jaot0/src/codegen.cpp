@@ -1,5 +1,6 @@
 #include "jaot/codegen.h"
 #include "jaot/frame.h"
+#include "jaot/machine.h"
 
 #include <array>
 #include <cstddef>
@@ -22,7 +23,7 @@ namespace JAOT {
                     std::ostream &out,
                     const std::unordered_map<std::string, MethodSignature> &methods,
                     const std::unordered_map<std::string, IR::Class> &classes
-            ) : out_(out), methods_(methods), classes_(classes) {
+            ) : out_(out), machine_(out), methods_(methods), classes_(classes) {
             }
 
             void generate(const IR::Method &method) {
@@ -32,16 +33,7 @@ namespace JAOT {
 
                 const int frameSize = frame_.frameSize();
 
-                out_ << ".text\n";
-                out_ << ".globl jaot_" << methodName_ << "\n";
-                out_ << ".type jaot_" << methodName_ << ", @function\n";
-                out_ << "jaot_" << methodName_ << ":\n";
-                out_ << "    pushq %rbp\n";
-                out_ << "    movq %rsp, %rbp\n";
-
-                if (frameSize > 0) {
-                    out_ << "    subq $" << frameSize << ", %rsp\n";
-                }
+                machine_.beginFunction("jaot_" + methodName_, frameSize);
 
                 if (method.parameters.size() > ArgumentRegisters32.size()) {
                     throw std::runtime_error(
@@ -60,8 +52,10 @@ namespace JAOT {
                 }
 
                 for (const IR::BasicBlock &block : method.blocks) {
-                    out_ << ".Ljaot_" << methodName_
-                         << "_block_" << block.id << ":\n";
+                    machine_.label(
+                        ".Ljaot_" + methodName_ +
+                        "_block_" + std::to_string(block.id)
+                    );
 
                     for (const IR::Statement &statement : block.statements) {
                         generateStatement(statement);
@@ -75,18 +69,19 @@ namespace JAOT {
 
             void generateStatement(const IR::Statement &statement) {
                 switch (statement.kind) {
-                    case IR::StatementKind::AssignLocal:
+                    case IR::StatementKind::AssignLocal: {
                         if (!statement.expression) {
                             throw std::runtime_error(
                                 "IR local assignment without value");
                         }
-                        generateExpression(*statement.expression);
-                        out_ << (frame_.type(statement.target).kind == Type::Reference
-                                     ? "    movq %rax, "
-                                     : "    movl %eax, ")
-                             << frame_.offset(statement.target)
-                             << "(%rbp)\n";
+                        const ValueLocation value =
+                            generateExpression(*statement.expression);
+                        machine_.storeFrameSlot(
+                            frame_.offset(statement.target),
+                            value
+                        );
                         return;
+                    }
 
                     case IR::StatementKind::AssignField: {
                         if (!statement.targetExpression ||
@@ -97,30 +92,42 @@ namespace JAOT {
                         }
 
                         const IR::Expr &target = *statement.targetExpression;
-                        generateExpression(*target.left);
+                        const ValueLocation receiver =
+                            generateExpression(*target.left);
+                        machine_.push(receiver);
 
-                        out_ << "    pushq %rax\n";
-                        stackDepth_ += 8;
+                        const ValueLocation value =
+                            generateExpression(*statement.expression);
 
-                        generateExpression(*statement.expression);
-
-                        out_ << (target.type.kind == Type::Reference
-                            ? "    movq %rax, %rdx\n"
-                            : "    movl %eax, %edx\n");
-                        out_ << "    popq %rcx\n";
-                        stackDepth_ -= 8;
+                        machine_.emitRaw(
+                            value.kind == ValueKind::Reference64
+                                ? "    movq %rax, %rdx\n"
+                                : "    movl %eax, %edx\n"
+                        );
+                        const ValueLocation restoredReceiver =
+                            machine_.pop(ValueKind::Reference64);
 
                         const std::size_t nullLabel = fieldLabelCounter_++;
-                        out_ << "    testq %rcx, %rcx\n";
-                        out_ << "    jne .Ljaot_" << methodName_ << "_nonnull_" << nullLabel << "\n";
+                        const std::string nonNullLabel =
+                            ".Ljaot_" + methodName_ +
+                            "_nonnull_" + std::to_string(nullLabel);
 
-                        emitCall("jaot_null_dereference");
+                        machine_.jumpIfNotZero(
+                            restoredReceiver,
+                            nonNullLabel
+                        );
+                        machine_.call("jaot_null_dereference");
 
-                        out_ << ".Ljaot_" << methodName_ << "_nonnull_" << nullLabel << ":\n";
-                        out_ << (target.type.kind == Type::Reference
-                            ? "    movq %rdx, "
-                            : "    movl %edx, ")
-                            << target.fieldOffset << "(%rcx)\n";
+                        machine_.label(nonNullLabel);
+                        machine_.emitRaw(
+                            value.kind == ValueKind::Reference64
+                                ? "    movq %rdx, "
+                                : "    movl %edx, "
+                        );
+                        machine_.emitRaw(
+                            std::to_string(target.fieldOffset) +
+                            "(%rax)\n"
+                        );
 
                         return;
                     }
@@ -140,49 +147,54 @@ namespace JAOT {
             void generateTerminator(const IR::Terminator &terminator) {
                 switch (terminator.kind) {
                     case IR::TerminatorKind::Jump:
-                        out_ << "    jmp .Ljaot_" << methodName_
-                             << "_block_" << terminator.target << "\n";
+                        machine_.jump(
+                            ".Ljaot_" + methodName_ +
+                            "_block_" + std::to_string(terminator.target)
+                        );
                         return;
 
-                    case IR::TerminatorKind::Branch:
+                    case IR::TerminatorKind::Branch: {
                         if (!terminator.condition) {
                             throw std::runtime_error("IR branch without condition");
                         }
 
-                        generateExpression(*terminator.condition);
-                        out_ << "    testl %eax, %eax\n";
-                        out_ << "    jne .Ljaot_" << methodName_ << "_block_" << terminator.trueTarget << "\n";
-                        out_ << "    jmp .Ljaot_" << methodName_ << "_block_" << terminator.falseTarget << "\n";
+                        const ValueLocation condition =
+                            generateExpression(*terminator.condition);
+                        machine_.jumpIfNotZero(
+                            condition,
+                            ".Ljaot_" + methodName_ +
+                            "_block_" + std::to_string(terminator.trueTarget)
+                        );
+                        machine_.jump(
+                            ".Ljaot_" + methodName_ +
+                            "_block_" + std::to_string(terminator.falseTarget)
+                        );
                         return;
+                    }
 
                     case IR::TerminatorKind::Return:
                         if (terminator.expression) {
                             generateExpression(*terminator.expression);
                         } else {
-                            out_ << "    movl $0, %eax\n";
+                            machine_.emitIntConstant(0);
                         }
 
-                        out_ << "    leave\n";
-                        out_ << "    ret\n";
+                        machine_.endFunction();
                         return;
                 }
                 throw std::runtime_error("unknown IR terminator kind");
             }
 
-            void generateExpression(const IR::Expr &expression) {
+            ValueLocation generateExpression(const IR::Expr &expression) {
                 switch (expression.kind) {
                     case IR::ExprKind::Integer:
-                        out_ << "    movl $" << expression.integer
-                             << ", %eax\n";
-                        return;
+                        return machine_.emitIntConstant(expression.integer);
 
                     case IR::ExprKind::Boolean:
-                        out_ << "    movl $" << (expression.boolean ? 1 : 0) << ", %eax\n";
-                        return;
+                        return machine_.emitBooleanConstant(expression.boolean);
 
                     case IR::ExprKind::Null:
-                        out_ << "    xorq %rax, %rax\n";
-                        return;
+                        return machine_.emitNull();
 
                     case IR::ExprKind::NewObject: {
                         const auto classFound = classes_.find(expression.className);
@@ -191,21 +203,21 @@ namespace JAOT {
                                 "unknown class: " + expression.className
                             );
                         }
-                        out_ << "    movq $" << classFound->second.size
-                             << ", %rdi\n";
-                        emitCall("jaot_allocate");
-                        return;
+                        machine_.emitIntConstant(
+                            static_cast<std::int64_t>(classFound->second.size)
+                        );
+                        machine_.prepareArgument(ValueLocation::intInEax(), 0);
+                        machine_.call("jaot_allocate");
+                        return ValueLocation::referenceInRax();
                     }
 
                     case IR::ExprKind::Local:
-                        if (expression.type.kind == Type::Reference) {
-                            out_ << "    movq " << frame_.offset(expression.local)
-                                 << "(%rbp), %rax\n";
-                        } else {
-                            out_ << "    movl " << frame_.offset(expression.local)
-                                 << "(%rbp), %eax\n";
-                        }
-                        return;
+                        return machine_.loadFrameSlot(
+                            frame_.offset(expression.local),
+                            expression.type.kind == Type::Reference
+                                ? ValueKind::Reference64
+                                : ValueKind::Int32
+                        );
 
                     case IR::ExprKind::FieldAccess: {
                         if (!expression.left) {
@@ -214,25 +226,35 @@ namespace JAOT {
                             );
                         }
 
-                        generateExpression(*expression.left);
+                        const ValueLocation receiver =
+                            generateExpression(*expression.left);
 
                         const std::size_t nullLabel = fieldLabelCounter_++;
 
-                        out_ << "    testq %rax, %rax\n";
-                        out_ << "    jne .Ljaot_" << methodName_ << "_nonnull_" << nullLabel << "\n";
+                        const std::string nonNullLabel =
+                            ".Ljaot_" + methodName_ +
+                            "_nonnull_" + std::to_string(nullLabel);
 
-                        emitCall("jaot_null_dereference");
+                        machine_.jumpIfNotZero(receiver, nonNullLabel);
+                        machine_.call("jaot_null_dereference");
 
-                        out_ << ".Ljaot_" << methodName_ << "_nonnull_" << nullLabel << ":\n";
-                        out_ << (expression.type.kind == Type::Reference
-                            ? "    movq "
-                            : "    movl ")
-                            << expression.fieldOffset << "(%rax), "
-                            << (expression.type.kind == Type::Reference
+                        machine_.label(nonNullLabel);
+                        machine_.emitRaw(
+                            expression.type.kind == Type::Reference
+                                ? "    movq "
+                                : "    movl "
+                        );
+                        machine_.emitRaw(
+                            std::to_string(expression.fieldOffset) +
+                            "(%rax), " +
+                            (expression.type.kind == Type::Reference
                                 ? "%rax\n"
-                                : "%eax\n");
+                                : "%eax\n")
+                        );
 
-                        return;
+                        return expression.type.kind == Type::Reference
+                            ? ValueLocation::referenceInRax()
+                            : ValueLocation::intInEax();
                     }
 
                     case IR::ExprKind::Unary:
@@ -241,9 +263,8 @@ namespace JAOT {
                         }
                         generateExpression(*expression.operand);
                         if (expression.unaryOperator == "!") {
-                            out_ << "    xorl $1, %eax\n";
-                            out_ << "    andl $1, %eax\n";
-                            return;
+                            machine_.emitUnaryNot();
+                            return ValueLocation::intInEax();
                         }
                         throw std::runtime_error("unknown IR unary operator");
 
@@ -252,37 +273,35 @@ namespace JAOT {
                             throw std::runtime_error(
                                 "incomplete IR binary expression");
                         }
-                        generateBinary(expression);
-                        return;
+                        return generateBinary(expression);
 
                     case IR::ExprKind::Call:
-                        generateCall(expression);
-                        return;
+                        return generateCall(expression);
                 }
 
                 throw std::runtime_error("unknown IR expression kind");
             }
 
-            void generateBinary(const IR::Expr &expression) {
+            ValueLocation generateBinary(const IR::Expr &expression) {
                 if (expression.binaryOperator == "&&") {
                     const std::string label =
                         ".Ljaot_" + methodName_ + "_logical_and_" +
                         std::to_string(divisionLabelCounter_++);
 
-                    generateExpression(*expression.left);
-                    out_ << "    testl %eax, %eax\n";
-                    out_ << "    je " << label << "\n";
+                    const ValueLocation left =
+                        generateExpression(*expression.left);
+                    machine_.jumpIfZero(left, label);
 
                     generateExpression(*expression.right);
-                    out_ << "    testl %eax, %eax\n";
-                    out_ << "    setne %al\n";
-                    out_ << "    movzbl %al, %eax\n";
-                    out_ << "    jmp " << label << "_done\n";
+                    machine_.emitRaw("    testl %eax, %eax\n");
+                    machine_.emitRaw("    setne %al\n");
+                    machine_.emitRaw("    movzbl %al, %eax\n");
+                    machine_.jump(label + "_done");
 
-                    out_ << label << ":\n";
-                    out_ << "    movl $0, %eax\n";
-                    out_ << label << "_done:\n";
-                    return;
+                    machine_.label(label);
+                    machine_.emitIntConstant(0);
+                    machine_.label(label + "_done");
+                    return ValueLocation::intInEax();
                 }
 
                 if (expression.binaryOperator == "||") {
@@ -290,102 +309,74 @@ namespace JAOT {
                         ".Ljaot_" + methodName_ + "_logical_or_" +
                         std::to_string(divisionLabelCounter_++);
 
-                    generateExpression(*expression.left);
-                    out_ << "    testl %eax, %eax\n";
-                    out_ << "    jne " << label << "\n";
+                    const ValueLocation left =
+                        generateExpression(*expression.left);
+                    machine_.jumpIfNotZero(left, label);
 
                     generateExpression(*expression.right);
-                    out_ << "    testl %eax, %eax\n";
-                    out_ << "    setne %al\n";
-                    out_ << "    movzbl %al, %eax\n";
-                    out_ << "    jmp " << label << "_done\n";
+                    machine_.emitRaw("    testl %eax, %eax\n");
+                    machine_.emitRaw("    setne %al\n");
+                    machine_.emitRaw("    movzbl %al, %eax\n");
+                    machine_.jump(label + "_done");
 
-                    out_ << label << ":\n";
-                    out_ << "    movl $1, %eax\n";
-                    out_ << label << "_done:\n";
-                    return;
+                    machine_.label(label);
+                    machine_.emitIntConstant(1);
+                    machine_.label(label + "_done");
+                    return ValueLocation::intInEax();
                 }
 
-                generateExpression(*expression.left);
-                out_ << "    pushq %rax\n";
-                stackDepth_ += 8;
+                const ValueLocation left =
+                    generateExpression(*expression.left);
+                machine_.push(left);
 
-                generateExpression(*expression.right);
+                const ValueLocation right =
+                    generateExpression(*expression.right);
                 if (expression.left->type.kind == Type::Reference) {
-                    out_ << "    movq %rax, %rcx\n";
+                    machine_.emitRaw("    movq %rax, %rcx\n");
                 } else {
-                    out_ << "    movl %eax, %ecx\n";
+                    machine_.emitRaw("    movl %eax, %ecx\n");
                 }
-                out_ << "    popq %rax\n";
-                stackDepth_ -= 8;
+                const ValueLocation restoredLeft =
+                    machine_.pop(left.kind);
 
                 if (expression.binaryOperator == "+") {
-                    out_ << "    addl %ecx, %eax\n";
+                    machine_.emitBinaryIntOperation("+");
                 } else if (expression.binaryOperator == "-") {
-                    out_ << "    subl %ecx, %eax\n";
+                    machine_.emitBinaryIntOperation("-");
                 } else if (expression.binaryOperator == "*") {
-                    out_ << "    imull %ecx, %eax\n";
+                    machine_.emitBinaryIntOperation("*");
                 } else if (expression.binaryOperator == "/") {
-                    const std::string label =
-                                ".Ljaot_" + methodName_ + "_division_" +
-                                std::to_string(divisionLabelCounter_++);
-                    const std::string normalLabel = label + "_normal";
-                    const std::string overflowLabel =
-                            label + "_overflow";
-                    const std::string zeroLabel = label + "_zero";
-                    const std::string doneLabel = label + "_done";
-
-                    out_ << "    testl %ecx, %ecx\n";
-                    out_ << "    je " << zeroLabel << "\n";
-                    out_ << "    cmpl $-1, %ecx\n";
-                    out_ << "    jne " << normalLabel << "\n";
-                    out_ << "    cmpl $-2147483648, %eax\n";
-                    out_ << "    je " << overflowLabel << "\n";
-                    out_ << normalLabel << ":\n";
-                    out_ << "    cltd\n";
-                    out_ << "    idivl %ecx\n";
-                    out_ << "    jmp " << doneLabel << "\n";
-                    out_ << overflowLabel << ":\n";
-                    out_ << "    movl $-2147483648, %eax\n";
-                    out_ << "    jmp " << doneLabel << "\n";
-                    out_ << zeroLabel << ":\n";
-                    out_ << "    ud2\n";
-                    out_ << doneLabel << ":\n";
+                    machine_.emitDivision(
+                        methodName_,
+                        divisionLabelCounter_++
+                    );
                 } else {
-                    const std::string condition = [&]() -> std::string {
-                        if (expression.binaryOperator == "==") return "e";
-                        if (expression.binaryOperator == "!=") return "ne";
-                        if (expression.binaryOperator == "<") return "l";
-                        if (expression.binaryOperator == "<=") return "le";
-                        if (expression.binaryOperator == ">") return "g";
-                        if (expression.binaryOperator == ">=") return "ge";
-                        throw std::runtime_error("unknown IR binary operator");
-                    }();
-
-                    if (expression.left->type.kind == Type::Reference) {
-                        out_ << "    cmpq %rcx, %rax\n";
-                    } else {
-                        out_ << "    cmpl %ecx, %eax\n";
-                    }
-                    out_ << "    set" << condition << " %al\n";
-                    out_ << "    movzbl %al, %eax\n";
+                    machine_.emitComparison(
+                        restoredLeft,
+                        right,
+                        expression.binaryOperator
+                    );
                 }
+
+                return ValueLocation::intInEax();
             }
 
-            void generateCall(const IR::Expr &expression) {
+            ValueLocation generateCall(const IR::Expr &expression) {
                 if (expression.callee.ownerClass == "<runtime>") {
                     if (expression.arguments.size() != 1) {
                         throw std::runtime_error(
                             expression.callee.name + " expects one argument");
                     }
 
-                    generateExpression(*expression.arguments[0]);
-                    out_ << "    movl %eax, %edi\n";
-                    emitCall(
+                    const ValueLocation argument =
+                        generateExpression(*expression.arguments[0]);
+                    machine_.prepareArgument(argument, 0);
+                    machine_.call(
                         expression.callee.name == "printInt"
                             ? "jaot_print_int"
-                            : "jaot_print_bool");
-                    return;
+                            : "jaot_print_bool"
+                    );
+                    return ValueLocation::intInEax();
                 }
 
                 const auto method = methods_.find(
@@ -416,37 +407,29 @@ namespace JAOT {
                 }
 
                 for (const auto &argument : expression.arguments) {
-                    generateExpression(*argument);
-                    out_ << "    pushq %rax\n";
-                    stackDepth_ += 8;
+                    const ValueLocation value =
+                        generateExpression(*argument);
+                    machine_.push(value);
                 }
 
-                for (std::size_t i = expression.arguments.size(); i > 0; --i) {
-                    out_ << "    popq " << ArgumentRegisters[i - 1] << "\n";
-                    stackDepth_ -= 8;
-                }
+                machine_.collectArguments(expression.arguments.size());
 
-                emitCall("jaot_" + methodSymbol(method->second));
-            }
-
-            void emitCall(const std::string &name) const {
-                const bool needsPadding = stackDepth_ % 16 != 0;
-                if (needsPadding) {
-                    out_ << "    subq $8, %rsp\n";
-                }
-
-                out_ << "    call " << name << "\n";
-
-                if (needsPadding) {
-                    out_ << "    addq $8, %rsp\n";
-                }
+                machine_.call("jaot_" + methodSymbol(method->second));
+                return ValueLocation{
+                    expression.type.kind == Type::Reference
+                        ? ValueKind::Reference64
+                        : ValueKind::Int32,
+                    expression.type.kind == Type::Reference
+                        ? ValueStorage::Rax
+                        : ValueStorage::Eax
+                };
             }
 
             std::ostream &out_;
+            Machine machine_;
             const std::unordered_map<std::string, MethodSignature> &methods_;
             const std::unordered_map<std::string, IR::Class> &classes_;
             FrameLayout frame_;
-            int stackDepth_ = 0;
             std::string methodName_;
             std::string currentClass_;
             std::size_t divisionLabelCounter_ = 0;
