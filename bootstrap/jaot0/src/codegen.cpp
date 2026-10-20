@@ -1,4 +1,5 @@
 #include "jaot/codegen.h"
+#include "jaot/frame.h"
 
 #include <array>
 #include <cstddef>
@@ -27,9 +28,9 @@ namespace JAOT {
             void generate(const IR::Method &method) {
                 methodName_ = methodSymbol(method.signature);
                 currentClass_ = method.signature.ownerClass;
-                collectLocals(method);
+                frame_.build(method);
 
-                const int frameSize = (stackSize_ + 15) & ~15;
+                const int frameSize = frame_.frameSize();
 
                 out_ << ".text\n";
                 out_ << ".globl jaot_" << methodName_ << "\n";
@@ -49,12 +50,12 @@ namespace JAOT {
 
                 for (std::size_t i = 0; i < method.parameters.size(); ++i) {
                     const IR::LocalId parameter = method.parameters[i];
-                    if (localType(parameter).kind == Type::Reference) {
+                    if (frame_.type(parameter).kind == Type::Reference) {
                         out_ << "    movq " << ArgumentRegisters[i] << ", "
-                             << localOffset(parameter) << "(%rbp)\n";
+                             << frame_.offset(parameter) << "(%rbp)\n";
                     } else {
                         out_ << "    movl " << ArgumentRegisters32[i] << ", "
-                             << localOffset(parameter) << "(%rbp)\n";
+                             << frame_.offset(parameter) << "(%rbp)\n";
                     }
                 }
 
@@ -71,28 +72,6 @@ namespace JAOT {
             }
 
         private:
-            static int localSize(const TypeRef &type) {
-                return type.kind == Type::Reference ? 8 : 4;
-            }
-
-            void collectLocals(const IR::Method &method) {
-                for (const IR::Local &local : method.locals) {
-                    const int size = localSize(local.type);
-                    const int offset = -stackSize_ - size;
-                    if (!locals_.emplace(local.id, offset).second) {
-                        throw std::runtime_error("duplicate IR local id");
-                    }
-                    localTypes_.emplace(local.id, local.type);
-                    stackSize_ += size;
-                }
-
-                for (const IR::LocalId parameter : method.parameters) {
-                    if (!locals_.contains(parameter)) {
-                        throw std::runtime_error(
-                            "method parameter has no IR local slot");
-                    }
-                }
-            }
 
             void generateStatement(const IR::Statement &statement) {
                 switch (statement.kind) {
@@ -102,10 +81,10 @@ namespace JAOT {
                                 "IR local assignment without value");
                         }
                         generateExpression(*statement.expression);
-                        out_ << (localType(statement.target).kind == Type::Reference
+                        out_ << (frame_.type(statement.target).kind == Type::Reference
                                      ? "    movq %rax, "
                                      : "    movl %eax, ")
-                             << localOffset(statement.target)
+                             << frame_.offset(statement.target)
                              << "(%rbp)\n";
                         return;
 
@@ -220,10 +199,10 @@ namespace JAOT {
 
                     case IR::ExprKind::Local:
                         if (expression.type.kind == Type::Reference) {
-                            out_ << "    movq " << localOffset(expression.local)
+                            out_ << "    movq " << frame_.offset(expression.local)
                                  << "(%rbp), %rax\n";
                         } else {
-                            out_ << "    movl " << localOffset(expression.local)
+                            out_ << "    movl " << frame_.offset(expression.local)
                                  << "(%rbp), %eax\n";
                         }
                         return;
@@ -463,29 +442,10 @@ namespace JAOT {
                 }
             }
 
-            int localOffset(IR::LocalId id) const {
-                const auto found = locals_.find(id);
-                if (found == locals_.end()) {
-                    throw std::runtime_error("unknown IR local id");
-                }
-
-                return found->second;
-            }
-
-            TypeRef localType(IR::LocalId id) const {
-                const auto found = localTypes_.find(id);
-                if (found == localTypes_.end()) {
-                    throw std::runtime_error("unknown IR local id");
-                }
-                return found->second;
-            }
-
             std::ostream &out_;
             const std::unordered_map<std::string, MethodSignature> &methods_;
             const std::unordered_map<std::string, IR::Class> &classes_;
-            std::unordered_map<IR::LocalId, int> locals_;
-            std::unordered_map<IR::LocalId, TypeRef> localTypes_;
-            int stackSize_ = 0;
+            FrameLayout frame_;
             int stackDepth_ = 0;
             std::string methodName_;
             std::string currentClass_;
