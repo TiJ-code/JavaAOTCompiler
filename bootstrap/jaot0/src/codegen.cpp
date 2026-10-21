@@ -1,6 +1,7 @@
 #include "jaot/codegen.h"
 #include "jaot/frame.h"
 #include "jaot/machine.h"
+#include "jaot/runtime_codegen.h"
 
 #include <array>
 #include <cstddef>
@@ -23,7 +24,11 @@ namespace JAOT {
                     std::ostream &out,
                     const std::unordered_map<std::string, MethodSignature> &methods,
                     const std::unordered_map<std::string, IR::Class> &classes
-            ) : out_(out), machine_(out), methods_(methods), classes_(classes) {
+            ) : out_(out),
+                machine_(out),
+                runtime_(machine_),
+                methods_(methods),
+                classes_(classes) {
             }
 
             void generate(const IR::Method &method) {
@@ -116,7 +121,7 @@ namespace JAOT {
                             restoredReceiver,
                             nonNullLabel
                         );
-                        machine_.call("jaot_null_dereference");
+                        runtime_.failNullDereference();
 
                         machine_.label(nonNullLabel);
                         machine_.emitRaw(
@@ -203,12 +208,7 @@ namespace JAOT {
                                 "unknown class: " + expression.className
                             );
                         }
-                        machine_.emitIntConstant(
-                            static_cast<std::int64_t>(classFound->second.size)
-                        );
-                        machine_.prepareArgument(ValueLocation::intInEax(), 0);
-                        machine_.call("jaot_allocate");
-                        return ValueLocation::referenceInRax();
+                        return runtime_.allocate(classFound->second.size);
                     }
 
                     case IR::ExprKind::Local:
@@ -236,7 +236,7 @@ namespace JAOT {
                             "_nonnull_" + std::to_string(nullLabel);
 
                         machine_.jumpIfNotZero(receiver, nonNullLabel);
-                        machine_.call("jaot_null_dereference");
+                        runtime_.failNullDereference();
 
                         machine_.label(nonNullLabel);
                         machine_.emitRaw(
@@ -370,11 +370,9 @@ namespace JAOT {
 
                     const ValueLocation argument =
                         generateExpression(*expression.arguments[0]);
-                    machine_.prepareArgument(argument, 0);
-                    machine_.call(
-                        expression.callee.name == "printInt"
-                            ? "jaot_print_int"
-                            : "jaot_print_bool"
+                    runtime_.print(
+                        argument,
+                        expression.callee.name == "printBool"
                     );
                     return ValueLocation::intInEax();
                 }
@@ -427,6 +425,7 @@ namespace JAOT {
 
             std::ostream &out_;
             Machine machine_;
+            RuntimeEmitter runtime_;
             const std::unordered_map<std::string, MethodSignature> &methods_;
             const std::unordered_map<std::string, IR::Class> &classes_;
             FrameLayout frame_;

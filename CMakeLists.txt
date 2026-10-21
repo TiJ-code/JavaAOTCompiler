@@ -15,16 +15,9 @@ option(JAOT_WARNINGS_AS_ERRORS
 )
 
 add_executable(jaot0
-        bootstrap/jaot0/include/jaot/ir.h
-        bootstrap/jaot0/include/jaot/ir_lowering.h
         bootstrap/jaot0/src/ir_lowering.cpp
-        bootstrap/jaot0/include/jaot/types.h
-        bootstrap/jaot0/include/jaot/ir_validator.h
         bootstrap/jaot0/src/ir_validator.cpp
-        bootstrap/jaot0/include/jaot/frame.h
         bootstrap/jaot0/src/frame.cpp
-        bootstrap/jaot0/src/machine.cpp
-        bootstrap/jaot0/include/jaot/machine.h
 )
 
 target_sources(jaot0
@@ -35,6 +28,8 @@ target_sources(jaot0
         bootstrap/jaot0/src/parser_statement.cpp
         bootstrap/jaot0/src/parser_expression.cpp
         bootstrap/jaot0/src/codegen.cpp
+        bootstrap/jaot0/src/machine.cpp
+        bootstrap/jaot0/src/runtime_codegen.cpp
         bootstrap/jaot0/src/semantic.cpp
 )
 
