@@ -18,6 +18,7 @@ add_executable(jaot0
         bootstrap/jaot0/src/ir_lowering.cpp
         bootstrap/jaot0/src/ir_validator.cpp
         bootstrap/jaot0/src/frame.cpp
+        bootstrap/jaot0/src/expression_codegen.cpp
 )
 
 target_sources(jaot0

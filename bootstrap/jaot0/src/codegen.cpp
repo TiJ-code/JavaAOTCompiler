@@ -1,4 +1,5 @@
 #include "jaot/codegen.h"
+#include "jaot/expression_codegen.h"
 #include "jaot/frame.h"
 #include "jaot/machine.h"
 #include "jaot/runtime_codegen.h"
@@ -39,6 +40,14 @@ namespace JAOT {
                 const int frameSize = frame_.frameSize();
 
                 machine_.beginFunction("jaot_" + methodName_, frameSize);
+                ExpressionLowerer expressions(
+                    machine_,
+                    runtime_,
+                    frame_,
+                    methods_,
+                    classes_,
+                    methodName_
+                );
 
                 if (method.parameters.size() > ArgumentRegisters32.size()) {
                     throw std::runtime_error(
@@ -63,16 +72,19 @@ namespace JAOT {
                     );
 
                     for (const IR::Statement &statement : block.statements) {
-                        generateStatement(statement);
+                        generateStatement(statement, expressions);
                     }
 
-                    generateTerminator(block.terminator);
+                    generateTerminator(block.terminator, expressions);
                 }
             }
 
         private:
 
-            void generateStatement(const IR::Statement &statement) {
+            void generateStatement(
+                const IR::Statement &statement,
+                ExpressionLowerer &expressions
+            ) {
                 switch (statement.kind) {
                     case IR::StatementKind::AssignLocal: {
                         if (!statement.expression) {
@@ -80,7 +92,7 @@ namespace JAOT {
                                 "IR local assignment without value");
                         }
                         const ValueLocation value =
-                            generateExpression(*statement.expression);
+                            expressions.lower(*statement.expression);
                         machine_.storeFrameSlot(
                             frame_.offset(statement.target),
                             value
@@ -98,11 +110,11 @@ namespace JAOT {
 
                         const IR::Expr &target = *statement.targetExpression;
                         const ValueLocation receiver =
-                            generateExpression(*target.left);
+                            expressions.lower(*target.left);
                         machine_.push(receiver);
 
                         const ValueLocation value =
-                            generateExpression(*statement.expression);
+                            expressions.lower(*statement.expression);
 
                         machine_.emitRaw(
                             value.kind == ValueKind::Reference64
@@ -115,7 +127,7 @@ namespace JAOT {
                         const std::size_t nullLabel = fieldLabelCounter_++;
                         const std::string nonNullLabel =
                             ".Ljaot_" + methodName_ +
-                            "_nonnull_" + std::to_string(nullLabel);
+                            "_field_nonnull_" + std::to_string(nullLabel);
 
                         machine_.jumpIfNotZero(
                             restoredReceiver,
@@ -142,14 +154,17 @@ namespace JAOT {
                             throw std::runtime_error(
                                 "IR expression statement without expression");
                         }
-                        generateExpression(*statement.expression);
+                        expressions.lower(*statement.expression);
                         return;
                 }
 
                 throw std::runtime_error("unknown IR statement kind");
             }
 
-            void generateTerminator(const IR::Terminator &terminator) {
+            void generateTerminator(
+                const IR::Terminator &terminator,
+                ExpressionLowerer &expressions
+            ) {
                 switch (terminator.kind) {
                     case IR::TerminatorKind::Jump:
                         machine_.jump(
@@ -164,7 +179,7 @@ namespace JAOT {
                         }
 
                         const ValueLocation condition =
-                            generateExpression(*terminator.condition);
+                            expressions.lower(*terminator.condition);
                         machine_.jumpIfNotZero(
                             condition,
                             ".Ljaot_" + methodName_ +
@@ -179,7 +194,7 @@ namespace JAOT {
 
                     case IR::TerminatorKind::Return:
                         if (terminator.expression) {
-                            generateExpression(*terminator.expression);
+                            expressions.lower(*terminator.expression);
                         } else {
                             machine_.emitIntConstant(0);
                         }
@@ -190,239 +205,6 @@ namespace JAOT {
                 throw std::runtime_error("unknown IR terminator kind");
             }
 
-            ValueLocation generateExpression(const IR::Expr &expression) {
-                switch (expression.kind) {
-                    case IR::ExprKind::Integer:
-                        return machine_.emitIntConstant(expression.integer);
-
-                    case IR::ExprKind::Boolean:
-                        return machine_.emitBooleanConstant(expression.boolean);
-
-                    case IR::ExprKind::Null:
-                        return machine_.emitNull();
-
-                    case IR::ExprKind::NewObject: {
-                        const auto classFound = classes_.find(expression.className);
-                        if (classFound == classes_.end()) {
-                            throw std::runtime_error(
-                                "unknown class: " + expression.className
-                            );
-                        }
-                        return runtime_.allocate(classFound->second.size);
-                    }
-
-                    case IR::ExprKind::Local:
-                        return machine_.loadFrameSlot(
-                            frame_.offset(expression.local),
-                            expression.type.kind == Type::Reference
-                                ? ValueKind::Reference64
-                                : ValueKind::Int32
-                        );
-
-                    case IR::ExprKind::FieldAccess: {
-                        if (!expression.left) {
-                            throw std::runtime_error(
-                                "incomplete IR field access"
-                            );
-                        }
-
-                        const ValueLocation receiver =
-                            generateExpression(*expression.left);
-
-                        const std::size_t nullLabel = fieldLabelCounter_++;
-
-                        const std::string nonNullLabel =
-                            ".Ljaot_" + methodName_ +
-                            "_nonnull_" + std::to_string(nullLabel);
-
-                        machine_.jumpIfNotZero(receiver, nonNullLabel);
-                        runtime_.failNullDereference();
-
-                        machine_.label(nonNullLabel);
-                        machine_.emitRaw(
-                            expression.type.kind == Type::Reference
-                                ? "    movq "
-                                : "    movl "
-                        );
-                        machine_.emitRaw(
-                            std::to_string(expression.fieldOffset) +
-                            "(%rax), " +
-                            (expression.type.kind == Type::Reference
-                                ? "%rax\n"
-                                : "%eax\n")
-                        );
-
-                        return expression.type.kind == Type::Reference
-                            ? ValueLocation::referenceInRax()
-                            : ValueLocation::intInEax();
-                    }
-
-                    case IR::ExprKind::Unary:
-                        if (!expression.operand) {
-                            throw std::runtime_error("incomplete IR unary expression");
-                        }
-                        generateExpression(*expression.operand);
-                        if (expression.unaryOperator == "!") {
-                            machine_.emitUnaryNot();
-                            return ValueLocation::intInEax();
-                        }
-                        throw std::runtime_error("unknown IR unary operator");
-
-                    case IR::ExprKind::Binary:
-                        if (!expression.left || !expression.right) {
-                            throw std::runtime_error(
-                                "incomplete IR binary expression");
-                        }
-                        return generateBinary(expression);
-
-                    case IR::ExprKind::Call:
-                        return generateCall(expression);
-                }
-
-                throw std::runtime_error("unknown IR expression kind");
-            }
-
-            ValueLocation generateBinary(const IR::Expr &expression) {
-                if (expression.binaryOperator == "&&") {
-                    const std::string label =
-                        ".Ljaot_" + methodName_ + "_logical_and_" +
-                        std::to_string(divisionLabelCounter_++);
-
-                    const ValueLocation left =
-                        generateExpression(*expression.left);
-                    machine_.jumpIfZero(left, label);
-
-                    generateExpression(*expression.right);
-                    machine_.emitRaw("    testl %eax, %eax\n");
-                    machine_.emitRaw("    setne %al\n");
-                    machine_.emitRaw("    movzbl %al, %eax\n");
-                    machine_.jump(label + "_done");
-
-                    machine_.label(label);
-                    machine_.emitIntConstant(0);
-                    machine_.label(label + "_done");
-                    return ValueLocation::intInEax();
-                }
-
-                if (expression.binaryOperator == "||") {
-                    const std::string label =
-                        ".Ljaot_" + methodName_ + "_logical_or_" +
-                        std::to_string(divisionLabelCounter_++);
-
-                    const ValueLocation left =
-                        generateExpression(*expression.left);
-                    machine_.jumpIfNotZero(left, label);
-
-                    generateExpression(*expression.right);
-                    machine_.emitRaw("    testl %eax, %eax\n");
-                    machine_.emitRaw("    setne %al\n");
-                    machine_.emitRaw("    movzbl %al, %eax\n");
-                    machine_.jump(label + "_done");
-
-                    machine_.label(label);
-                    machine_.emitIntConstant(1);
-                    machine_.label(label + "_done");
-                    return ValueLocation::intInEax();
-                }
-
-                const ValueLocation left =
-                    generateExpression(*expression.left);
-                machine_.push(left);
-
-                const ValueLocation right =
-                    generateExpression(*expression.right);
-                if (expression.left->type.kind == Type::Reference) {
-                    machine_.emitRaw("    movq %rax, %rcx\n");
-                } else {
-                    machine_.emitRaw("    movl %eax, %ecx\n");
-                }
-                const ValueLocation restoredLeft =
-                    machine_.pop(left.kind);
-
-                if (expression.binaryOperator == "+") {
-                    machine_.emitBinaryIntOperation("+");
-                } else if (expression.binaryOperator == "-") {
-                    machine_.emitBinaryIntOperation("-");
-                } else if (expression.binaryOperator == "*") {
-                    machine_.emitBinaryIntOperation("*");
-                } else if (expression.binaryOperator == "/") {
-                    machine_.emitDivision(
-                        methodName_,
-                        divisionLabelCounter_++
-                    );
-                } else {
-                    machine_.emitComparison(
-                        restoredLeft,
-                        right,
-                        expression.binaryOperator
-                    );
-                }
-
-                return ValueLocation::intInEax();
-            }
-
-            ValueLocation generateCall(const IR::Expr &expression) {
-                if (expression.callee.ownerClass == "<runtime>") {
-                    if (expression.arguments.size() != 1) {
-                        throw std::runtime_error(
-                            expression.callee.name + " expects one argument");
-                    }
-
-                    const ValueLocation argument =
-                        generateExpression(*expression.arguments[0]);
-                    runtime_.print(
-                        argument,
-                        expression.callee.name == "printBool"
-                    );
-                    return ValueLocation::intInEax();
-                }
-
-                const auto method = methods_.find(
-                    expression.callee.ownerClass + "." +
-                    expression.callee.name);
-                if (method == methods_.end()) {
-                    throw std::runtime_error(
-                        "unknown function: " + expression.callee.ownerClass +
-                        "." + expression.callee.name);
-                }
-
-                if (expression.arguments.size() !=
-                    method->second.parameterTypes.size()) {
-                    throw std::runtime_error(
-                        "function " + expression.callee.name + " expects " +
-                        std::to_string(method->second.parameterTypes.size()) +
-                        " arguments");
-                }
-
-                if (expression.receiver) {
-                    throw std::runtime_error(
-                        "instance method calls are not supported by JAOT0");
-                }
-
-                if (expression.arguments.size() > ArgumentRegisters.size()) {
-                    throw std::runtime_error(
-                        "JAOT0 functions support at most six arguments");
-                }
-
-                for (const auto &argument : expression.arguments) {
-                    const ValueLocation value =
-                        generateExpression(*argument);
-                    machine_.push(value);
-                }
-
-                machine_.collectArguments(expression.arguments.size());
-
-                machine_.call("jaot_" + methodSymbol(method->second));
-                return ValueLocation{
-                    expression.type.kind == Type::Reference
-                        ? ValueKind::Reference64
-                        : ValueKind::Int32,
-                    expression.type.kind == Type::Reference
-                        ? ValueStorage::Rax
-                        : ValueStorage::Eax
-                };
-            }
-
             std::ostream &out_;
             Machine machine_;
             RuntimeEmitter runtime_;
@@ -431,7 +213,6 @@ namespace JAOT {
             FrameLayout frame_;
             std::string methodName_;
             std::string currentClass_;
-            std::size_t divisionLabelCounter_ = 0;
             std::size_t fieldLabelCounter_ = 0;
         };
     }
