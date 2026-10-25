@@ -15,6 +15,10 @@ namespace JAOT {
     enum class ValueStorage {
         Eax,
         Rax,
+        Ecx,
+        Rcx,
+        Edx,
+        Rdx,
         Stack,
     };
 
@@ -26,8 +30,24 @@ namespace JAOT {
             return ValueLocation{ .kind = ValueKind::Int32, .storage = ValueStorage::Eax };
         }
 
+        static ValueLocation intInEcx() {
+            return ValueLocation{ .kind = ValueKind::Int32, .storage = ValueStorage::Ecx };
+        }
+
+        static ValueLocation intInEdx() {
+            return ValueLocation{ .kind = ValueKind::Int32, .storage = ValueStorage::Edx };
+        }
+
         static ValueLocation referenceInRax() {
             return ValueLocation{ .kind = ValueKind::Reference64, .storage = ValueStorage::Rax };
+        }
+
+        static ValueLocation referenceInRcx() {
+            return ValueLocation{ .kind = ValueKind::Reference64, .storage = ValueStorage::Rcx };
+        }
+
+        static ValueLocation referenceInRdx() {
+            return ValueLocation{ .kind = ValueKind::Reference64, .storage = ValueStorage::Rdx };
         }
 
         static ValueLocation onStack(const ValueKind kind) {
@@ -49,8 +69,6 @@ namespace JAOT {
 
         int stackDepth() const;
 
-        void emitRaw(std::string_view text) const;
-
         ValueLocation emitIntConstant(std::int64_t value) const;
         ValueLocation emitBooleanConstant(bool value) const;
         ValueLocation emitNull() const;
@@ -58,6 +76,15 @@ namespace JAOT {
         ValueLocation loadFrameSlot(int offset, ValueKind kind) const;
 
         void storeFrameSlot(int offset, ValueLocation value) const;
+
+        ValueLocation loadMemory(ValueLocation address, int offset, ValueKind kind) const;
+        void storeMemory(ValueLocation address, int offset, ValueLocation value) const;
+
+        ValueLocation saveForLater(ValueLocation value) const;
+
+        void storeArgumentInFrame(std::size_t index, int offset, ValueKind kind) const;
+
+        void normalizeBoolean() const;
 
         void push(ValueLocation value);
         ValueLocation pop(ValueKind kind);

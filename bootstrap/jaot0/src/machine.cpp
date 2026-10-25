@@ -13,6 +13,29 @@ namespace JAOT {
             "%edi", "%esi", "%edx", "%ecx", "%r8d", "%r9d"
         };
 
+        const char *registerName(const ValueLocation value) {
+            switch (value.storage) {
+                case ValueStorage::Eax:
+                    return "%eax";
+                case ValueStorage::Ecx:
+                    return "%ecx";
+                case ValueStorage::Edx:
+                    return "%edx";
+                case ValueStorage::Rax:
+                    return "%rax";
+                case ValueStorage::Rcx:
+                    return "%rcx";
+                case ValueStorage::Rdx:
+                    return "%rdx";
+                case ValueStorage::Stack:
+                    break;
+            }
+
+            throw std::runtime_error(
+                "stack-resident value has no register name"
+            );
+        }
+
     }
 
     Machine::Machine(std::ostream &out) : out_(out) {}
@@ -39,10 +62,6 @@ namespace JAOT {
 
     int Machine::stackDepth() const {
         return stackDepth_;
-    }
-
-    void Machine::emitRaw(const std::string_view text) const {
-        out_ << text;
     }
 
     ValueLocation Machine::emitIntConstant(const std::int64_t value) const {
@@ -81,6 +100,102 @@ namespace JAOT {
         }
 
         out_ << offset << "(%rbp)\n";
+    }
+
+    ValueLocation Machine::loadMemory(ValueLocation address, int offset, ValueKind kind) const {
+        if (address.kind != ValueKind::Reference64 || address.storage != ValueStorage::Rax) {
+            throw std::runtime_error("memory address must be a reference in %rax");
+        }
+
+        if (kind == ValueKind::Reference64) {
+            out_ << "    movq " << offset << "(%rax), %rax\n";
+            return ValueLocation::referenceInRax();
+        }
+
+        out_ << "    movl " << offset << "(%rax), %eax\n";
+        return ValueLocation::intInEax();
+    }
+
+    void Machine::storeMemory(ValueLocation address, int offset, ValueLocation value) const {
+        if (address.kind != ValueKind::Reference64 || address.storage != ValueStorage::Rax) {
+            throw std::runtime_error("memory address must be a reference in %rax");
+        }
+
+        if (value.storage == ValueStorage::Stack) {
+            throw std::runtime_error("cannot store a stack-resident value directly into memory");
+        }
+
+        if (value.kind == ValueKind::Reference64) {
+            if (value.storage != ValueStorage::Rax &&
+                value.storage != ValueStorage::Rcx &&
+                value.storage != ValueStorage::Rdx) {
+                throw std::runtime_error("reference value is not in a supported register");
+            }
+
+            out_ << "    movq " << registerName(value) << ", " << offset << "(%rax)\n";
+            return;
+        }
+
+        if (value.storage != ValueStorage::Eax &&
+            value.storage != ValueStorage::Ecx &&
+            value.storage != ValueStorage::Edx) {
+            throw std::runtime_error("integer value is not in a supported register");
+        }
+
+        out_ << "    movl " << registerName(value) << ", " << offset << "(%rax)\n";
+    }
+
+    ValueLocation Machine::saveForLater(ValueLocation value) const {
+        if (value.storage == ValueStorage::Stack) {
+            throw std::runtime_error("cannot save a stack-resident value");
+        }
+
+        if (value.kind == ValueKind::Reference64) {
+            if (value.storage == ValueStorage::Rax) {
+                out_ << "    movq %rax, %rdx\n";
+            } else if (value.storage == ValueStorage::Rcx) {
+                out_ << "    movq %rcx, %rdx\n";
+            } else if (value.storage != ValueStorage::Rdx) {
+                throw std::runtime_error(
+                    "reference value is not in a supported register"
+                );
+            }
+
+            return ValueLocation::referenceInRdx();
+        }
+
+        if (value.storage == ValueStorage::Eax) {
+            out_ << "    movl %eax, %ecx\n";
+        } else if (value.storage == ValueStorage::Edx) {
+            out_ << "    movl %edx, %ecx\n";
+        } else if (value.storage != ValueStorage::Ecx) {
+            throw std::runtime_error(
+                "integer value is not in a supported register"
+            );
+        }
+
+        return ValueLocation::intInEcx();
+    }
+
+    void Machine::storeArgumentInFrame(std::size_t index, int offset, ValueKind kind) const {
+        if (index >= ArgumentRegisters.size()) {
+            throw std::runtime_error(
+                "JAOT0 functions support at most six parameters"
+            );
+        }
+
+        if (kind == ValueKind::Reference64) {
+            out_ << "    movq " << ArgumentRegisters[index] << ", " << offset << "(%rbp)\n";
+            return;
+        }
+
+        out_ << "    movl " << ArgumentRegisters32[index] << ", " << offset << "(%rbp)\n";
+    }
+
+    void Machine::normalizeBoolean() const {
+        out_ << "    testl %eax, %eax\n";
+        out_ << "    setne %al\n";
+        out_ << "    movzbl %al, %eax\n";
     }
 
     void Machine::push(const ValueLocation value) {
@@ -206,6 +321,22 @@ namespace JAOT {
             throw std::runtime_error("comparison operands have incompatible value kinds");
         }
 
+        if (left.kind == ValueKind::Reference64) {
+            if (right.storage != ValueStorage::Rax &&
+                right.storage != ValueStorage::Rcx &&
+                right.storage != ValueStorage::Rdx) {
+                throw std::runtime_error(
+                    "reference comparison operand is not in a supported register"
+                );
+            }
+        } else if (right.storage != ValueStorage::Eax &&
+                   right.storage != ValueStorage::Ecx &&
+                   right.storage != ValueStorage::Edx) {
+            throw std::runtime_error(
+                "integer comparison operand is not in a supported register"
+            );
+        }
+
         const char *condition = nullptr;
 
         if (operation == "==") {
@@ -226,11 +357,11 @@ namespace JAOT {
             );
         }
 
-        if (left.kind == ValueKind::Reference64) {
-            out_ << "    cmpq %rcx, %rax\n";
-        } else {
-            out_ << "    cmpl %ecx, %eax\n";
-        }
+        out_ << "    cmp"
+             << (left.kind == ValueKind::Reference64 ? "q " : "l ")
+             << registerName(right)
+             << ", "
+             << (left.kind == ValueKind::Reference64 ? "%rax\n" : "%eax\n");
 
         out_ << "    set" << condition << "  %al\n";
         out_ << "    movzbl %al, %eax\n";

@@ -91,22 +91,11 @@ namespace JAOT {
         runtime_.failNullDereference();
         machine_.label(nonNullLabel);
 
-        machine_.emitRaw(
-            expression.type.kind == Type::Reference
-                ? "    movq "
-                : "    movl "
+        return machine_.loadMemory(
+            receiver,
+            static_cast<int>(expression.fieldOffset),
+            valueKind(expression.type)
         );
-        machine_.emitRaw(
-            std::to_string(expression.fieldOffset) +
-            "(%rax), " +
-            (expression.type.kind == Type::Reference
-                 ? "%rax\n"
-                 : "%eax\n")
-        );
-
-        return expression.type.kind == Type::Reference
-                   ? ValueLocation::referenceInRax()
-                   : ValueLocation::intInEax();
     }
 
     ValueLocation ExpressionLowerer::lowerUnary(
@@ -143,9 +132,7 @@ namespace JAOT {
             machine_.jumpIfZero(left, falseLabel);
 
             lower(*expression.right);
-            machine_.emitRaw("    testl %eax, %eax\n");
-            machine_.emitRaw("    setne %al\n");
-            machine_.emitRaw("    movzbl %al, %eax\n");
+            machine_.normalizeBoolean();
             machine_.jump(doneLabel);
 
             machine_.label(falseLabel);
@@ -162,9 +149,7 @@ namespace JAOT {
             machine_.jumpIfNotZero(left, trueLabel);
 
             lower(*expression.right);
-            machine_.emitRaw("    testl %eax, %eax\n");
-            machine_.emitRaw("    setne %al\n");
-            machine_.emitRaw("    movzbl %al, %eax\n");
+            machine_.normalizeBoolean();
             machine_.jump(doneLabel);
 
             machine_.label(trueLabel);
@@ -177,11 +162,7 @@ namespace JAOT {
         machine_.push(left);
 
         const ValueLocation right = lower(*expression.right);
-        if (left.kind == ValueKind::Reference64) {
-            machine_.emitRaw("    movq %rax, %rcx\n");
-        } else {
-            machine_.emitRaw("    movl %eax, %ecx\n");
-        }
+        const ValueLocation savedRight = machine_.saveForLater(right);
 
         const ValueLocation restoredLeft = machine_.pop(left.kind);
 
@@ -199,7 +180,7 @@ namespace JAOT {
 
         machine_.emitComparison(
             restoredLeft,
-            right,
+            savedRight,
             expression.binaryOperator
         );
         return ValueLocation::intInEax();

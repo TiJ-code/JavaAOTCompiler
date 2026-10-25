@@ -4,7 +4,6 @@
 #include "jaot/machine.h"
 #include "jaot/runtime_codegen.h"
 
-#include <array>
 #include <cstddef>
 #include <stdexcept>
 #include <string>
@@ -12,13 +11,6 @@
 
 namespace JAOT {
     namespace {
-        constexpr std::array<const char *, 6> ArgumentRegisters = {
-            "%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"
-        };
-        constexpr std::array<const char *, 6> ArgumentRegisters32 = {
-            "%edi", "%esi", "%edx", "%ecx", "%r8d", "%r9d"
-        };
-
         class FunctionGenerator {
         public:
             FunctionGenerator(
@@ -49,20 +41,20 @@ namespace JAOT {
                     methodName_
                 );
 
-                if (method.parameters.size() > ArgumentRegisters32.size()) {
+                if (method.parameters.size() > 6) {
                     throw std::runtime_error(
                         "JAOT0 functions support at most six parameters");
                 }
 
                 for (std::size_t i = 0; i < method.parameters.size(); ++i) {
                     const IR::LocalId parameter = method.parameters[i];
-                    if (frame_.type(parameter).kind == Type::Reference) {
-                        out_ << "    movq " << ArgumentRegisters[i] << ", "
-                             << frame_.offset(parameter) << "(%rbp)\n";
-                    } else {
-                        out_ << "    movl " << ArgumentRegisters32[i] << ", "
-                             << frame_.offset(parameter) << "(%rbp)\n";
-                    }
+                    machine_.storeArgumentInFrame(
+                        i,
+                        frame_.offset(parameter),
+                        frame_.type(parameter).kind == Type::Reference
+                            ? ValueKind::Reference64
+                            : ValueKind::Int32
+                    );
                 }
 
                 for (const IR::BasicBlock &block : method.blocks) {
@@ -116,11 +108,8 @@ namespace JAOT {
                         const ValueLocation value =
                             expressions.lower(*statement.expression);
 
-                        machine_.emitRaw(
-                            value.kind == ValueKind::Reference64
-                                ? "    movq %rax, %rdx\n"
-                                : "    movl %eax, %edx\n"
-                        );
+                        const ValueLocation savedValue =
+                            machine_.saveForLater(value);
                         const ValueLocation restoredReceiver =
                             machine_.pop(ValueKind::Reference64);
 
@@ -136,14 +125,10 @@ namespace JAOT {
                         runtime_.failNullDereference();
 
                         machine_.label(nonNullLabel);
-                        machine_.emitRaw(
-                            value.kind == ValueKind::Reference64
-                                ? "    movq %rdx, "
-                                : "    movl %edx, "
-                        );
-                        machine_.emitRaw(
-                            std::to_string(target.fieldOffset) +
-                            "(%rax)\n"
+                        machine_.storeMemory(
+                            restoredReceiver,
+                            static_cast<int>(target.fieldOffset),
+                            savedValue
                         );
 
                         return;
