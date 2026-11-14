@@ -2,6 +2,9 @@
 
 namespace JAOT {
     int FrameLayout::localSize(const TypeRef &type) {
+        if (type.kind == Type::Short) {
+            return 2;
+        }
         return type.kind == Type::Reference || type.kind == Type::Long ? 8 : 4;
     }
 

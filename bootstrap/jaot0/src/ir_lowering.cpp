@@ -177,6 +177,12 @@ namespace JAOT {
                         lowered->integer = expression.integer;
                         return lowered;
 
+                    case ExprKind::ShortInteger:
+                        lowered->kind = IR::ExprKind::ShortInteger;
+                        lowered->type = TypeRef{Type::Short, {}};
+                        lowered->integer = expression.integer;
+                        return lowered;
+
                     case ExprKind::LongInteger:
                         lowered->kind = IR::ExprKind::LongInteger;
                         lowered->type = TypeRef{Type::Long, {}};
@@ -269,7 +275,8 @@ namespace JAOT {
                             if (lowered->left->type.kind !=
                                     lowered->right->type.kind ||
                                 (lowered->left->type.kind != Type::Int &&
-                                 lowered->left->type.kind != Type::Long)) {
+                                 lowered->left->type.kind != Type::Short &&
+                                lowered->left->type.kind != Type::Long)) {
                                 loweringError(
                                     "arithmetic operators require matching int or long operands");
                             }
@@ -302,6 +309,7 @@ namespace JAOT {
                         lowered->kind = IR::ExprKind::Call;
 
                         if (expression.callee == "printInt" ||
+                            expression.callee == "printShort" ||
                             expression.callee == "printLong" ||
                             expression.callee == "printBool") {
                             lowered->callee = MethodSignature{
@@ -312,6 +320,8 @@ namespace JAOT {
                                     TypeRef{
                                         expression.callee == "printInt"
                                             ? Type::Int
+                                            : expression.callee == "printShort"
+                                            ? Type::Short
                                             : expression.callee == "printLong"
                                             ? Type::Long
                                             : Type::Boolean,
@@ -698,7 +708,9 @@ namespace JAOT {
                     .name = field.name,
                     .type = field.type,
                     .offset = offset,
-                    .size = field.type.kind == Type::Reference ||
+                    .size = field.type.kind == Type::Short
+                        ? std::size_t{2}
+                        : field.type.kind == Type::Reference ||
                             field.type.kind == Type::Long
                         ? std::size_t{8}
                         : std::size_t{4}

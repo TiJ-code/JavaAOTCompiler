@@ -100,6 +100,9 @@ namespace JAOT {
                 case ExprKind::Integer:
                     return TypeRef{.kind = Type::Int, .className = {}};
 
+                case ExprKind::ShortInteger:
+                    return TypeRef{.kind = Type::Short, .className = {}};
+
                 case ExprKind::LongInteger:
                     return TypeRef{.kind = Type::Long, .className = {}};
 
@@ -166,6 +169,7 @@ namespace JAOT {
                         expression.op == "*" || expression.op == "/") {
                         if (left.kind != right.kind ||
                             (left.kind != Type::Int &&
+                             left.kind != Type::Short &&
                              left.kind != Type::Long)) {
                             semanticError(
                                 expression.location,
@@ -179,6 +183,7 @@ namespace JAOT {
                         expression.op == ">" || expression.op == ">=") {
                         if (left.kind != right.kind ||
                             (left.kind != Type::Int &&
+                             left.kind != Type::Short &&
                              left.kind != Type::Long)) {
                             semanticError(
                                 expression.location,
@@ -200,6 +205,7 @@ namespace JAOT {
 
                         if (left.kind != right.kind ||
                             (left.kind != Type::Int &&
+                             left.kind != Type::Short &&
                              left.kind != Type::Long &&
                              left.kind != Type::Boolean &&
                              left.kind != Type::Reference)) {
@@ -285,6 +291,24 @@ namespace JAOT {
                                 typeName(argumentType) + ")");
                         }
 
+                        return TypeRef{Type::Void, {}};
+                    }
+
+                    if (expression.callee == "printShort") {
+                        if (expression.arguments.size() != 1) {
+                            semanticError(
+                                expression.location,
+                                "printShort expects one argument");
+                        }
+                        const TypeRef argumentType = checkExpression(
+                            *expression.arguments[0], scopes, initialized,
+                            methods, fields, currentClass);
+                        if (argumentType.kind != Type::Short) {
+                            semanticError(
+                                expression.arguments[0]->location,
+                                "printShort argument must have type short (actual: " +
+                                typeName(argumentType) + ")");
+                        }
                         return TypeRef{Type::Void, {}};
                     }
 
@@ -796,6 +820,7 @@ namespace JAOT {
         for (const ClassDeclaration &declaration : program.classes) {
             for (const Method &method : declaration.methods) {
                 if (method.name == "printInt" ||
+                    method.name == "printShort" ||
                     method.name == "printLong" ||
                     method.name == "printBool") {
                     semanticError(

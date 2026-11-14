@@ -23,6 +23,12 @@ namespace JAOT {
                     }
                     return;
 
+                case IR::ExprKind::ShortInteger:
+                    if (expression.type.kind != Type::Short) {
+                        invalid("short integer expression has non-short type");
+                    }
+                    return;
+
                 case IR::ExprKind::LongInteger:
                     if (expression.type.kind != Type::Long) {
                         invalid("long integer expression has non-long type");
@@ -186,7 +192,7 @@ namespace JAOT {
 
             std::size_t expectedSize = 0;
             for (const IR::Field &field : classDeclaration.fields) {
-                if (field.size != 4 && field.size != 8) {
+                if (field.size != 2 && field.size != 4 && field.size != 8) {
                     invalid("field has invalid size");
                 }
                 expectedSize += field.size;

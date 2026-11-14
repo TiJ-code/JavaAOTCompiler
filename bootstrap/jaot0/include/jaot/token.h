@@ -9,12 +9,14 @@ namespace JAOT {
 
         Identifier,
         Integer,
+        ShortInteger,
         LongInteger,
 
         KwClass,
         KwStatic,
         KwVoid,
         KwInt,
+        KwShort,
         KwLong,
         KwBoolean,
         KwTrue,

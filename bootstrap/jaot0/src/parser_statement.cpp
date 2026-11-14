@@ -18,6 +18,7 @@ namespace JAOT {
 
     Stmt Parser::parseStatement() {
         if (check(TokenKind::KwInt) ||
+            check(TokenKind::KwShort) ||
             check(TokenKind::KwLong) ||
             check(TokenKind::KwBoolean)) {
             const ParsedType type = parseType(false);

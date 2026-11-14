@@ -69,6 +69,11 @@ namespace JAOT {
         return ValueLocation::intInEax();
     }
 
+    ValueLocation Machine::emitShortConstant(const std::int64_t value) const {
+        out_ << "    movl $" << value << ", %eax\n";
+        return ValueLocation::shortInEax();
+    }
+
     ValueLocation Machine::emitLongConstant(const std::int64_t value) const {
         out_ << "    movabsq $" << value << ", %rax\n";
         return ValueLocation::longInRax();
@@ -84,6 +89,10 @@ namespace JAOT {
     }
 
     ValueLocation Machine::loadFrameSlot(const int offset, const ValueKind kind) const {
+        if (kind == ValueKind::Int16) {
+            out_ << "    movswl " << offset << "(%rbp), %eax\n";
+            return ValueLocation::shortInEax();
+        }
         if (kind == ValueKind::Reference64 || kind == ValueKind::Int64) {
             out_ << "    movq " << offset << "(%rbp), %rax\n";
             return kind == ValueKind::Reference64
@@ -100,7 +109,9 @@ namespace JAOT {
             throw std::runtime_error("cannot store a stack-resident value directly into a frame slot");
         }
 
-        if (value.kind == ValueKind::Reference64 || value.kind == ValueKind::Int64) {
+        if (value.kind == ValueKind::Int16) {
+            out_ << "    movw %ax, ";
+        } else if (value.kind == ValueKind::Reference64 || value.kind == ValueKind::Int64) {
             out_ << "    movq %rax, ";
         } else {
             out_ << "    movl %eax, ";
@@ -114,6 +125,10 @@ namespace JAOT {
             throw std::runtime_error("memory address must be a reference in %rax");
         }
 
+        if (kind == ValueKind::Int16) {
+            out_ << "    movswl " << offset << "(%rax), %eax\n";
+            return ValueLocation::shortInEax();
+        }
         if (kind == ValueKind::Reference64 || kind == ValueKind::Int64) {
             out_ << "    movq " << offset << "(%rax), %rax\n";
             return kind == ValueKind::Reference64
@@ -132,6 +147,16 @@ namespace JAOT {
 
         if (value.storage == ValueStorage::Stack) {
             throw std::runtime_error("cannot store a stack-resident value directly into memory");
+        }
+
+        if (value.kind == ValueKind::Int16) {
+            if (value.storage != ValueStorage::Eax &&
+                value.storage != ValueStorage::Ecx &&
+                value.storage != ValueStorage::Edx) {
+                throw std::runtime_error("short value is not in a supported register");
+            }
+            out_ << "    movw " << registerName(value) << ", " << offset << "(%rax)\n";
+            return;
         }
 
         if (value.kind == ValueKind::Reference64 || value.kind == ValueKind::Int64) {
@@ -194,7 +219,9 @@ namespace JAOT {
             );
         }
 
-        return ValueLocation::intInEcx();
+        return value.kind == ValueKind::Int16
+            ? ValueLocation::shortInEcx()
+            : ValueLocation::intInEcx();
     }
 
     void Machine::storeArgumentInFrame(std::size_t index, int offset, ValueKind kind) const {
@@ -204,6 +231,14 @@ namespace JAOT {
             );
         }
 
+        if (kind == ValueKind::Int16) {
+            static constexpr std::array<const char *, 6> ArgumentRegisters16 = {
+                "%di", "%si", "%dx", "%cx", "%r8w", "%r9w"
+            };
+            out_ << "    movw " << ArgumentRegisters16[index] << ", "
+                 << offset << "(%rbp)\n";
+            return;
+        }
         if (kind == ValueKind::Reference64 || kind == ValueKind::Int64) {
             out_ << "    movq " << ArgumentRegisters[index] << ", " << offset << "(%rbp)\n";
             return;
@@ -242,6 +277,10 @@ namespace JAOT {
 
         if (kind == ValueKind::Int64) {
             return ValueLocation::longInRax();
+        }
+
+        if (kind == ValueKind::Int16) {
+            return ValueLocation::shortInEax();
         }
 
         return ValueLocation::intInEax();
@@ -340,6 +379,11 @@ namespace JAOT {
         const std::string_view operation,
         const ValueKind kind
     ) const {
+        if (kind == ValueKind::Int16) {
+            emitBinaryIntOperation(operation);
+            out_ << "    movswl %ax, %eax\n";
+            return;
+        }
         if (kind != ValueKind::Int64) {
             emitBinaryIntOperation(operation);
             return;
@@ -438,6 +482,7 @@ namespace JAOT {
         const std::string doneLabel = base + "_done";
 
         const bool isLong = kind == ValueKind::Int64;
+        const bool isShort = kind == ValueKind::Int16;
         out_ << "    test" << (isLong ? "q" : "l") << " "
              << (isLong ? "%rcx" : "%ecx") << ", "
              << (isLong ? "%rcx" : "%ecx") << "\n";
@@ -451,7 +496,8 @@ namespace JAOT {
             out_ << "    movabsq $-9223372036854775808, %rdx\n";
             out_ << "    cmpq %rdx, %rax\n";
         } else {
-            out_ << "    cmpl $-2147483648, %eax\n";
+            out_ << "    cmpl $" << (isShort ? "-32768" : "-2147483648")
+                 << ", %eax\n";
         }
         out_ << "    je " << overflowLabel << "\n";
 
@@ -462,6 +508,9 @@ namespace JAOT {
         } else {
             out_ << "    cltd\n";
             out_ << "    idivl %ecx\n";
+            if (isShort) {
+                out_ << "    movswl %ax, %eax\n";
+            }
         }
         out_ << "    jmp " << doneLabel << "\n";
 
@@ -469,7 +518,8 @@ namespace JAOT {
         if (isLong) {
             out_ << "    movabsq $-9223372036854775808, %rax\n";
         } else {
-            out_ << "    movl $-2147483648, %eax\n";
+            out_ << "    movl $" << (isShort ? "-32768" : "-2147483648")
+                 << ", %eax\n";
         }
         out_ << "    jmp " << doneLabel << "\n";
 

@@ -53,6 +53,8 @@ namespace JAOT {
                         frame_.offset(parameter),
                         frame_.type(parameter).kind == Type::Reference
                             ? ValueKind::Reference64
+                            : frame_.type(parameter).kind == Type::Short
+                            ? ValueKind::Int16
                             : frame_.type(parameter).kind == Type::Long
                             ? ValueKind::Int64
                             : ValueKind::Int32

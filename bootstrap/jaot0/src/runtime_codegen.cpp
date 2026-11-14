@@ -12,7 +12,11 @@ namespace JAOT {
     }
 
     void RuntimeEmitter::print(const ValueLocation value, const std::string_view name) const {
-        if (name == "printLong") {
+        if (name == "printShort") {
+            if (value.kind != ValueKind::Int16) {
+                throw std::runtime_error("printShort requires a short value");
+            }
+        } else if (name == "printLong") {
             if (value.kind != ValueKind::Int64) {
                 throw std::runtime_error("printLong requires a long value");
             }
@@ -22,7 +26,9 @@ namespace JAOT {
 
         machine_.prepareArgument(value, 0);
         machine_.call(name == "printBool" ? "jaot_print_bool" :
-                      name == "printLong" ? "jaot_print_long" : "jaot_print_int");
+                      name == "printLong" ? "jaot_print_long" :
+                      name == "printInt" ? "jaot_print_int" :
+                      name == "printShort" ? "jaot_print_short" : "jaot_print_char");
     }
 
     void RuntimeEmitter::failNullDereference() const {
