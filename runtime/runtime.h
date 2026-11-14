@@ -9,6 +9,7 @@ void *jaot_allocate(std::size_t size);
 void jaot_null_dereference();
 
 void jaot_print_int(int value);
+void jaot_print_long(long long value);
 void jaot_print_bool(int value);
 
 #ifdef __cplusplus

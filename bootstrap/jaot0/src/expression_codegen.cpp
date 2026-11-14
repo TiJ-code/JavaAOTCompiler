@@ -23,6 +23,8 @@ namespace JAOT {
     ValueKind ExpressionLowerer::valueKind(const TypeRef &type) const {
         return type.kind == Type::Reference
                    ? ValueKind::Reference64
+                   : type.kind == Type::Long
+                   ? ValueKind::Int64
                    : ValueKind::Int32;
     }
 
@@ -38,6 +40,9 @@ namespace JAOT {
         switch (expression.kind) {
             case IR::ExprKind::Integer:
                 return machine_.emitIntConstant(expression.integer);
+
+            case IR::ExprKind::LongInteger:
+                return machine_.emitLongConstant(expression.integer);
 
             case IR::ExprKind::Boolean:
                 return machine_.emitBooleanConstant(expression.boolean);
@@ -169,13 +174,22 @@ namespace JAOT {
         if (expression.binaryOperator == "+" ||
             expression.binaryOperator == "-" ||
             expression.binaryOperator == "*") {
-            machine_.emitBinaryIntOperation(expression.binaryOperator);
-            return ValueLocation::intInEax();
+            machine_.emitBinaryOperation(
+                expression.binaryOperator,
+                valueKind(expression.type));
+            return expression.type.kind == Type::Long
+                ? ValueLocation::longInRax()
+                : ValueLocation::intInEax();
         }
 
         if (expression.binaryOperator == "/") {
-            machine_.emitDivision(methodName_, labelCounter_++);
-            return ValueLocation::intInEax();
+            machine_.emitDivision(
+                methodName_,
+                labelCounter_++,
+                valueKind(expression.type));
+            return expression.type.kind == Type::Long
+                ? ValueLocation::longInRax()
+                : ValueLocation::intInEax();
         }
 
         machine_.emitComparison(
@@ -198,10 +212,7 @@ namespace JAOT {
             const ValueLocation argument =
                     lower(*expression.arguments[0]);
 
-            runtime_.print(
-                argument,
-                expression.callee.name == "printBool"
-            );
+            runtime_.print(argument, expression.callee.name);
             return ValueLocation::intInEax();
         }
 
@@ -247,6 +258,8 @@ namespace JAOT {
 
         return expression.type.kind == Type::Reference
                    ? ValueLocation::referenceInRax()
+                   : expression.type.kind == Type::Long
+                   ? ValueLocation::longInRax()
                    : ValueLocation::intInEax();
     }
 } // namespace JAOT

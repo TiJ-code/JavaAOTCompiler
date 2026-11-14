@@ -9,6 +9,7 @@ namespace JAOT {
 
     enum class ValueKind {
         Int32,
+        Int64,
         Reference64,
     };
 
@@ -50,6 +51,18 @@ namespace JAOT {
             return ValueLocation{ .kind = ValueKind::Reference64, .storage = ValueStorage::Rdx };
         }
 
+        static ValueLocation longInRax() {
+            return ValueLocation{ .kind = ValueKind::Int64, .storage = ValueStorage::Rax };
+        }
+
+        static ValueLocation longInRcx() {
+            return ValueLocation{ .kind = ValueKind::Int64, .storage = ValueStorage::Rcx };
+        }
+
+        static ValueLocation longInRdx() {
+            return ValueLocation{ .kind = ValueKind::Int64, .storage = ValueStorage::Rdx };
+        }
+
         static ValueLocation onStack(const ValueKind kind) {
             return ValueLocation{ .kind = kind, .storage = ValueStorage::Stack };
         }
@@ -70,6 +83,7 @@ namespace JAOT {
         int stackDepth() const;
 
         ValueLocation emitIntConstant(std::int64_t value) const;
+        ValueLocation emitLongConstant(std::int64_t value) const;
         ValueLocation emitBooleanConstant(bool value) const;
         ValueLocation emitNull() const;
 
@@ -105,10 +119,12 @@ namespace JAOT {
 
         void emitUnaryNot() const;
         void emitBinaryIntOperation(std::string_view operation) const;
+        void emitBinaryOperation(std::string_view operation, ValueKind kind) const;
 
         void emitComparison(ValueLocation left, ValueLocation right, std::string_view operation) const;
 
         void emitDivision(std::string_view methodName, std::size_t labelId) const;
+        void emitDivision(std::string_view methodName, std::size_t labelId, ValueKind kind) const;
 
     private:
         void emitCallInstruction(std::string_view symbol) const;

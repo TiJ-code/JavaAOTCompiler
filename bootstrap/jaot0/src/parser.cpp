@@ -47,6 +47,13 @@ namespace JAOT {
             };
         }
 
+        if (match(TokenKind::KwLong)) {
+            return ParsedType {
+                .type = {.kind = Type::Long, .className = {}},
+                .location = {.line = token.line, .column = token.column}
+            };
+        }
+
         if (match(TokenKind::KwBoolean)) {
             return ParsedType {
                 .type = {.kind = Type::Boolean, .className = {}},

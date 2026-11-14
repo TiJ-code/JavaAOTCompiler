@@ -10,6 +10,11 @@ void jaot_print_int(int value) {
 }
 
 extern "C"
+void jaot_print_long(long long value) {
+    std::printf("%lld\n", value);
+}
+
+extern "C"
 void jaot_print_bool(int value) {
     std::printf(value ? "true\n" : "false\n");
 }

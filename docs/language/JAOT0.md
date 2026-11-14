@@ -145,8 +145,8 @@ static ReturnType methodName(ParameterList) {
 ```
 
 All methods are static. A method's parameter and return types may be `int`,
-`boolean`, or a class reference type. Methods are called without an object
-receiver.
+`long`, `boolean`, or a class reference type. Methods are called without an
+object receiver.
 
 ## 6. Entry Point
 
@@ -188,7 +188,27 @@ Integer values use signed 32-bit semantics. The valid literal range is
 `-2147483648` through `2147483647`. Addition, subtraction, and multiplication
 wrap modulo 2^32 when their mathematical result is outside that range.
 
-## 7.2 `void`
+## 7.2 `long`
+
+`long` is a signed 64-bit integer value.
+
+```java
+long distance = 5000000000L;
+```
+
+Long literals use a mandatory `L` or `l` suffix. Unsuffixed integer literals
+have type `int`; `int` and `long` are distinct types and JAOT0 does not
+implicitly convert between them. The representable signed range is
+`-9223372036854775808` through `9223372036854775807`. The compiler must accept
+`-9223372036854775808L` as the minimum `long` value even though its positive
+magnitude is not representable as a `long`.
+
+Addition, subtraction, and multiplication use two's-complement 64-bit semantics
+and wrap modulo 2^64. Division is signed integer division. Division by zero is
+a runtime failure. The `long` type may be used for locals, parameters, return
+values, and fields.
+
+## 7.3 `void`
 
 `void` means that a method does not return a value.
 
@@ -200,7 +220,7 @@ static void hello() {
 
 A `void` method cannot be used as an expression.
 
-## 7.3 `boolean`
+## 7.4 `boolean`
 
 `boolean` is a value type whose only values are `true` and `false`. It can be
 used as a method parameter or return type, and as a local variable type:
@@ -216,7 +236,7 @@ static boolean isPositive(int value) {
 Boolean and integer values are distinct types. JAOT0 does not implicitly
 convert between them. `true` and `false` are boolean literals.
 
-## 7.4 Class reference types
+## 7.5 Class reference types
 
 Each declared class name is also a reference type. A reference value is either
 `null` or the identity of an object allocated from that class. Reference types
@@ -237,21 +257,20 @@ declared class types cannot be compared, but a reference can be compared with
 `null`. `null == null` is `true` and `null != null` is `false`.
 
 The `new ClassName()` expression allocates a distinct object of that class.
-Every field is initialized to its default value: `0` for `int`, `false` for
-`boolean`, and `null` for a reference type. Object allocation does not call a
-constructor; constructors are not supported. Objects remain allocated for the
+Every field is initialized to its default value: `0` for `int` and `long`,
+`false` for `boolean`, and `null` for a reference type. Object allocation does
+not call a constructor; constructors are not supported. Objects remain allocated for the
 lifetime of the program; JAOT0 does not specify or require garbage collection.
 If allocation fails, the program terminates abnormally.
 
 Reading or writing a field through a `null` reference terminates the program
 abnormally with a null-dereference runtime failure.
 
-## 7.5 Future types
+## 7.6 Future types
 
 The following are intentionally reserved for later stages:
 
 ```text
-long
 char
 arrays
 String
@@ -259,12 +278,13 @@ String
 
 ## 8. Variables
 
-Local variables of type `int`, `boolean`, or a declared class reference type can
+Local variables of type `int`, `long`, `boolean`, or a declared class reference type can
 be declared inside methods. They may be declared with or without an initializer:
 
 ```java
 int answer;
 int initialized = 42;
+long distance = 5000000000L;
 boolean enabled = true;
 Node next = null;
 ```
@@ -301,7 +321,7 @@ assignment-statement:
 
 ## 10. Expressions
 
-JAOT0 supports integer, boolean, and reference expressions.
+JAOT0 supports `int`, `long`, boolean, and reference expressions.
 
 ```java
 1 + 2
@@ -318,6 +338,7 @@ enabled == false
 Expressions can contain:
 
 - integer literals
+- long literals
 - boolean literals
 - `null`
 - object allocation expressions
@@ -351,6 +372,13 @@ Integer division truncates toward zero. Dividing by zero terminates the
 program abnormally. The otherwise-overflowing expression
 `-2147483648 / -1` evaluates to `-2147483648`.
 
+Arithmetic operators require both operands to have the same numeric type.
+Operations on `int` produce `int`; operations on `long` produce `long`.
+Comparisons produce `boolean`. Logical operators require `boolean` operands.
+The otherwise-overflowing expression
+`-9223372036854775808L / -1L` evaluates to
+`-9223372036854775808L`.
+
 ```java
 int a = 10 + 5;
 int b = 10 - 5;
@@ -373,9 +401,10 @@ Operator precedence, from highest to lowest:
 ```
 
 Operators at the same precedence level associate from left to right. Arithmetic
-operators require `int` operands and produce an `int`. Relational operators
-require `int` operands and produce a `boolean`. Equality operators require two
-operands of the same type and produce a `boolean`: `int`, `boolean`, or the same
+operators require two operands of the same numeric type, `int` or `long`, and
+produce that type. Relational operators require two operands of the same numeric
+type and produce a `boolean`. Equality operators require two operands of the same
+type and produce a `boolean`: `int`, `long`, `boolean`, or the same
 class reference type. A reference may also be compared with `null`. The
 logical negation operator `!` requires a `boolean` operand and produces a
 `boolean`. The logical operators `&&` and `||` require `boolean` operands and
@@ -440,13 +469,14 @@ bytes to preserve the required stack alignment for calls.
 
 The prologue saves the caller's frame pointer, establishes the new `%rbp`, and
 reserves the aligned frame allocation. Methods return `int` and `boolean`
-results in `%eax`; boolean results use the same `0`/`1` representation.
-Reference results are returned in `%rax`. The epilogue uses `leave` and `ret`
+results in `%eax`; `long` results are returned in `%rax`; boolean results use
+the same `0`/`1` representation. Reference results are also returned in `%rax`.
+The epilogue uses `leave` and `ret`
 to restore the caller's frame and return address.
 
 Arguments use the x86-64 System V integer argument registers in order: `%rdi`,
 `%rsi`, `%rdx`, `%rcx`, `%r8`, and `%r9`. `int` and `boolean` arguments use
-their 32-bit register portions; reference arguments use the full 64-bit
+their 32-bit register portions; `long` and reference arguments use the full 64-bit
 registers. The callee copies arguments into their parameter slots. JAOT0
 currently supports at most six parameters per method; stack-passed arguments
 are not implemented.
@@ -466,11 +496,12 @@ instruction syntax follows GNU `as`'s
 Instruction behavior is based on Intel's
 [64 and IA-32 Software Developer Manuals](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html).
 
-Object references to occupy eight-byte slots in JAOT0's initial x86-64 backend.
+Object references occupy eight-byte slots in JAOT0's initial x86-64 backend.
 The slot stores a native object address; `null` is represented by zero. Object
-fields use four bytes for `int` and `boolean` values and eight bytes for
-references. The object representation is an implementation detail except for
-these observable reference and default-value semantics.
+fields use four bytes for `int` and `boolean` values, eight bytes for `long`
+values, and eight bytes for references. The object representation is an
+implementation detail except for these observable reference and default-value
+semantics.
 
 ## 14. Built-in Runtime Functions
 
@@ -480,11 +511,12 @@ Initially:
 
 ```java
 printInt(int value)
+printLong(long value)
 printBool(boolean value)
 ```
 
-`printInt` prints an integer followed by a newline. `printBool` prints either
-`true` or `false` followed by a newline.
+`printInt` and `printLong` print their numeric argument followed by a newline.
+`printBool` prints either `true` or `false` followed by a newline.
 
 ```java
 printInt(42);
@@ -500,9 +532,12 @@ true
 false
 ```
 
-`printInt` and `printBool` are not normal JAOT0 methods implemented by the program. They are supplied by the native runtime.
+`printInt`, `printLong`, and `printBool` are not normal JAOT0 methods
+implemented by the program. They are supplied by the native runtime.
 
 `printBool` accepts only a `boolean` operand; passing an `int` is a semantic error.
+`printInt` accepts only an `int` operand. `long` values are printed with
+`printLong(long value)`.
 
 ## 15. Return Statements
 
@@ -518,7 +553,7 @@ A `void` method may use:
 return;
 ```
 
-Every `int` and `boolean` method must return a value of its declared type on
+Every `int`, `long`, and `boolean` method must return a value of its declared type on
 every reachable path. A `void` method may either return with `return;` or reach
 the end of its body. A return expression must have exactly the declared return
 type; `void` methods cannot return a value.
@@ -662,6 +697,7 @@ class
 static 
 void
 int
+long
 boolean
 true
 false
@@ -733,12 +769,14 @@ parameter
 
 type
     ::= "int"
+      | "long"
       | "boolean"
       | identifier
       | "void";
 
 value-type
     ::= "int"
+      | "long"
       | "boolean"
       | identifier;
 
@@ -812,6 +850,7 @@ unary
 
 primary-expression
     ::= integer
+      | long-literal
       | "true"
       | "false"
       | "null"
@@ -834,6 +873,9 @@ argument-list
     
 integer
     ::= digit+ ;
+
+long-literal
+    ::= digit+ ("L" | "l") ;
     
 identifier
     ::= (letter | "_") (letter | digit | "_")* ;

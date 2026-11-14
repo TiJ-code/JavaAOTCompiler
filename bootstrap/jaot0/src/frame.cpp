@@ -2,7 +2,7 @@
 
 namespace JAOT {
     int FrameLayout::localSize(const TypeRef &type) {
-        return type.kind == Type::Reference ? 8 : 4;
+        return type.kind == Type::Reference || type.kind == Type::Long ? 8 : 4;
     }
 
     void FrameLayout::build(const IR::Method &method) {

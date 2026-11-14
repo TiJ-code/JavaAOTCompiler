@@ -69,6 +69,11 @@ namespace JAOT {
         return ValueLocation::intInEax();
     }
 
+    ValueLocation Machine::emitLongConstant(const std::int64_t value) const {
+        out_ << "    movabsq $" << value << ", %rax\n";
+        return ValueLocation::longInRax();
+    }
+
     ValueLocation Machine::emitBooleanConstant(const bool value) const {
         return emitIntConstant(value ? 1 : 0);
     }
@@ -79,9 +84,11 @@ namespace JAOT {
     }
 
     ValueLocation Machine::loadFrameSlot(const int offset, const ValueKind kind) const {
-        if (kind == ValueKind::Reference64) {
+        if (kind == ValueKind::Reference64 || kind == ValueKind::Int64) {
             out_ << "    movq " << offset << "(%rbp), %rax\n";
-            return ValueLocation::referenceInRax();
+            return kind == ValueKind::Reference64
+                ? ValueLocation::referenceInRax()
+                : ValueLocation::longInRax();
         }
 
         out_ << "    movl " << offset << "(%rbp), %eax\n";
@@ -93,7 +100,7 @@ namespace JAOT {
             throw std::runtime_error("cannot store a stack-resident value directly into a frame slot");
         }
 
-        if (value.kind == ValueKind::Reference64) {
+        if (value.kind == ValueKind::Reference64 || value.kind == ValueKind::Int64) {
             out_ << "    movq %rax, ";
         } else {
             out_ << "    movl %eax, ";
@@ -107,9 +114,11 @@ namespace JAOT {
             throw std::runtime_error("memory address must be a reference in %rax");
         }
 
-        if (kind == ValueKind::Reference64) {
+        if (kind == ValueKind::Reference64 || kind == ValueKind::Int64) {
             out_ << "    movq " << offset << "(%rax), %rax\n";
-            return ValueLocation::referenceInRax();
+            return kind == ValueKind::Reference64
+                ? ValueLocation::referenceInRax()
+                : ValueLocation::longInRax();
         }
 
         out_ << "    movl " << offset << "(%rax), %eax\n";
@@ -125,7 +134,7 @@ namespace JAOT {
             throw std::runtime_error("cannot store a stack-resident value directly into memory");
         }
 
-        if (value.kind == ValueKind::Reference64) {
+        if (value.kind == ValueKind::Reference64 || value.kind == ValueKind::Int64) {
             if (value.storage != ValueStorage::Rax &&
                 value.storage != ValueStorage::Rcx &&
                 value.storage != ValueStorage::Rdx) {
@@ -164,6 +173,17 @@ namespace JAOT {
             return ValueLocation::referenceInRdx();
         }
 
+        if (value.kind == ValueKind::Int64) {
+            if (value.storage == ValueStorage::Rax) {
+                out_ << "    movq %rax, %rcx\n";
+            } else if (value.storage == ValueStorage::Rdx) {
+                out_ << "    movq %rdx, %rcx\n";
+            } else if (value.storage != ValueStorage::Rcx) {
+                throw std::runtime_error("long value is not in a supported register");
+            }
+            return ValueLocation::longInRcx();
+        }
+
         if (value.storage == ValueStorage::Eax) {
             out_ << "    movl %eax, %ecx\n";
         } else if (value.storage == ValueStorage::Edx) {
@@ -184,7 +204,7 @@ namespace JAOT {
             );
         }
 
-        if (kind == ValueKind::Reference64) {
+        if (kind == ValueKind::Reference64 || kind == ValueKind::Int64) {
             out_ << "    movq " << ArgumentRegisters[index] << ", " << offset << "(%rbp)\n";
             return;
         }
@@ -220,6 +240,10 @@ namespace JAOT {
             return ValueLocation::referenceInRax();
         }
 
+        if (kind == ValueKind::Int64) {
+            return ValueLocation::longInRax();
+        }
+
         return ValueLocation::intInEax();
     }
 
@@ -236,7 +260,7 @@ namespace JAOT {
             throw std::runtime_error("cannot prepare a stack-resident value as an argument");
         }
 
-        if (value.kind == ValueKind::Reference64) {
+        if (value.kind == ValueKind::Reference64 || value.kind == ValueKind::Int64) {
             out_ << "    movq %rax, " << ArgumentRegisters[index] << "\n";
         } else {
             out_ << "    movl %eax, " << ArgumentRegisters32[index] << "\n";
@@ -259,7 +283,7 @@ namespace JAOT {
             throw std::runtime_error("cannot test a stack-resident value directly");
         }
 
-        if (value.kind == ValueKind::Reference64) {
+        if (value.kind == ValueKind::Reference64 || value.kind == ValueKind::Int64) {
             out_ << "    testq %rax, %rax\n";
         } else {
             out_ << "    testl %eax, %eax\n";
@@ -312,6 +336,26 @@ namespace JAOT {
         );
     }
 
+    void Machine::emitBinaryOperation(
+        const std::string_view operation,
+        const ValueKind kind
+    ) const {
+        if (kind != ValueKind::Int64) {
+            emitBinaryIntOperation(operation);
+            return;
+        }
+
+        if (operation == "+") {
+            out_ << "    addq %rcx, %rax\n";
+        } else if (operation == "-") {
+            out_ << "    subq %rcx, %rax\n";
+        } else if (operation == "*") {
+            out_ << "    imulq %rcx, %rax\n";
+        } else {
+            throw std::runtime_error("unknown long binary operation");
+        }
+    }
+
     void Machine::emitComparison(const ValueLocation left, const ValueLocation right, const std::string_view operation) const {
         if (left.storage == ValueStorage::Stack || right.storage == ValueStorage::Stack) {
             throw std::runtime_error("comparison operands must be in registers");
@@ -329,7 +373,15 @@ namespace JAOT {
                     "reference comparison operand is not in a supported register"
                 );
             }
-        } else if (right.storage != ValueStorage::Eax &&
+        } else if (left.kind == ValueKind::Int64 &&
+                   right.storage != ValueStorage::Rax &&
+                   right.storage != ValueStorage::Rcx &&
+                   right.storage != ValueStorage::Rdx) {
+            throw std::runtime_error(
+                "long comparison operand is not in a supported register"
+            );
+        } else if (left.kind != ValueKind::Int64 &&
+                   right.storage != ValueStorage::Eax &&
                    right.storage != ValueStorage::Ecx &&
                    right.storage != ValueStorage::Edx) {
             throw std::runtime_error(
@@ -358,16 +410,26 @@ namespace JAOT {
         }
 
         out_ << "    cmp"
-             << (left.kind == ValueKind::Reference64 ? "q " : "l ")
+             << (left.kind == ValueKind::Reference64 ||
+                 left.kind == ValueKind::Int64 ? "q " : "l ")
              << registerName(right)
              << ", "
-             << (left.kind == ValueKind::Reference64 ? "%rax\n" : "%eax\n");
+             << (left.kind == ValueKind::Reference64 ||
+                 left.kind == ValueKind::Int64 ? "%rax\n" : "%eax\n");
 
         out_ << "    set" << condition << "  %al\n";
         out_ << "    movzbl %al, %eax\n";
     }
 
     void Machine::emitDivision(const std::string_view methodName, const std::size_t labelId) const {
+        emitDivision(methodName, labelId, ValueKind::Int32);
+    }
+
+    void Machine::emitDivision(
+        const std::string_view methodName,
+        const std::size_t labelId,
+        const ValueKind kind
+    ) const {
         const std::string base = ".Ljaot_" + std::string(methodName) + "_division_" + std::to_string(labelId);
 
         const std::string normalLabel = base + "_normal";
@@ -375,22 +437,40 @@ namespace JAOT {
         const std::string zeroLabel = base + "_zero";
         const std::string doneLabel = base + "_done";
 
-        out_ << "    testl %ecx, %ecx\n";
+        const bool isLong = kind == ValueKind::Int64;
+        out_ << "    test" << (isLong ? "q" : "l") << " "
+             << (isLong ? "%rcx" : "%ecx") << ", "
+             << (isLong ? "%rcx" : "%ecx") << "\n";
         out_ << "    je " << zeroLabel << "\n";
 
-        out_ << "    cmpl $-1, %ecx\n";
+        out_ << "    cmp" << (isLong ? "q" : "l") << " $-1, "
+             << (isLong ? "%rcx" : "%ecx") << "\n";
         out_ << "    jne " << normalLabel << "\n";
 
-        out_ << "    cmpl $-2147483648, %eax\n";
+        if (isLong) {
+            out_ << "    movabsq $-9223372036854775808, %rdx\n";
+            out_ << "    cmpq %rdx, %rax\n";
+        } else {
+            out_ << "    cmpl $-2147483648, %eax\n";
+        }
         out_ << "    je " << overflowLabel << "\n";
 
         out_ << normalLabel << ":\n";
-        out_ << "    cltd\n";
-        out_ << "    idivl %ecx\n";
+        if (isLong) {
+            out_ << "    cqto\n";
+            out_ << "    idivq %rcx\n";
+        } else {
+            out_ << "    cltd\n";
+            out_ << "    idivl %ecx\n";
+        }
         out_ << "    jmp " << doneLabel << "\n";
 
         out_ << overflowLabel << ":\n";
-        out_ << "    movl $-2147483648, %eax\n";
+        if (isLong) {
+            out_ << "    movabsq $-9223372036854775808, %rax\n";
+        } else {
+            out_ << "    movl $-2147483648, %eax\n";
+        }
         out_ << "    jmp " << doneLabel << "\n";
 
         out_ << zeroLabel << ":\n";

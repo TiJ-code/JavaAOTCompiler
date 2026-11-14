@@ -14,6 +14,7 @@ namespace JAOT::IR {
 
     enum class ExprKind {
         Integer,
+        LongInteger,
         Boolean,
         Null,
         NewObject,

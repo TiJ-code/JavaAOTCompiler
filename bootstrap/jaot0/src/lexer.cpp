@@ -12,6 +12,7 @@ namespace JAOT {
             {"static", TokenKind::KwStatic},
             {"void", TokenKind::KwVoid},
             {"int", TokenKind::KwInt},
+            {"long", TokenKind::KwLong},
             {"boolean", TokenKind::KwBoolean},
             {"true", TokenKind::KwTrue},
             {"false", TokenKind::KwFalse},
@@ -37,6 +38,9 @@ namespace JAOT {
             case TokenKind::Integer:
                 return "integer";
 
+            case TokenKind::LongInteger:
+                return "long integer";
+
             case TokenKind::KwClass:
                 return "class";
 
@@ -48,6 +52,9 @@ namespace JAOT {
 
             case TokenKind::KwInt:
                 return "int";
+
+            case TokenKind::KwLong:
+                return "long";
 
             case TokenKind::KwBoolean:
                 return "boolean";
@@ -267,7 +274,14 @@ namespace JAOT {
             text += advance();
         }
 
-        return {TokenKind::Integer, text, startLine, startColumn};
+        TokenKind kind = TokenKind::Integer;
+
+        if (peek() == 'L' || peek() == 'l') {
+            text += advance();
+            kind = TokenKind::LongInteger;
+        }
+
+        return {kind, text, startLine, startColumn};
     }
 
     void Lexer::error(const std::string &message) const {

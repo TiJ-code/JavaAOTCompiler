@@ -7,6 +7,7 @@
 namespace JAOT {
     enum class Type {
         Int,
+        Long,
         Boolean,
         Reference,
         Void,
@@ -53,6 +54,8 @@ namespace JAOT {
         switch (type.kind) {
             case Type::Int:
                 return "int";
+            case Type::Long:
+                return "long";
             case Type::Boolean:
                 return "boolean";
             case Type::Void:

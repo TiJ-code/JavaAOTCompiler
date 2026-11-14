@@ -1,0 +1,17 @@
+class Main {
+    static long add(long a, long b) {
+        return a + b;
+    }
+
+    static void main() {
+        long value = add(3000000000L, 4000000000L);
+        printLong(value);
+        printLong(value / 2L);
+        printLong(-9223372036854775808L);
+        if (value > 7000000000L) {
+            printLong(1L);
+        } else {
+            printLong(0L);
+        }
+    }
+}

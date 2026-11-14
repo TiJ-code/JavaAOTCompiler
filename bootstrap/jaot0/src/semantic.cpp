@@ -100,6 +100,9 @@ namespace JAOT {
                 case ExprKind::Integer:
                     return TypeRef{.kind = Type::Int, .className = {}};
 
+                case ExprKind::LongInteger:
+                    return TypeRef{.kind = Type::Long, .className = {}};
+
                 case ExprKind::Boolean:
                     return TypeRef{.kind = Type::Boolean, .className = {}};
 
@@ -161,18 +164,22 @@ namespace JAOT {
 
                     if (expression.op == "+" || expression.op == "-" ||
                         expression.op == "*" || expression.op == "/") {
-                        if (left.kind != Type::Int || right.kind != Type::Int) {
+                        if (left.kind != right.kind ||
+                            (left.kind != Type::Int &&
+                             left.kind != Type::Long)) {
                             semanticError(
                                 expression.location,
                                 "arithmetic operands must have type int (left: " +
                                 typeName(left) + ", right: " + typeName(right) + ")");
                         }
-                        return TypeRef{Type::Int, {}};
+                        return TypeRef{left.kind, {}};
                     }
 
                     if (expression.op == "<" || expression.op == "<=" ||
                         expression.op == ">" || expression.op == ">=") {
-                        if (left.kind != Type::Int || right.kind != Type::Int) {
+                        if (left.kind != right.kind ||
+                            (left.kind != Type::Int &&
+                             left.kind != Type::Long)) {
                             semanticError(
                                 expression.location,
                                 "relational operands must have type int (left: " +
@@ -193,6 +200,7 @@ namespace JAOT {
 
                         if (left.kind != right.kind ||
                             (left.kind != Type::Int &&
+                             left.kind != Type::Long &&
                              left.kind != Type::Boolean &&
                              left.kind != Type::Reference)) {
                             semanticError(
@@ -252,6 +260,31 @@ namespace JAOT {
                                 "printInt argument must have type int (actual: " +
                                 typeName(argumentType) + ")");
                         }
+                        return TypeRef{Type::Void, {}};
+                    }
+
+                    if (expression.callee == "printLong") {
+                        if (expression.arguments.size() != 1) {
+                            semanticError(
+                                expression.location,
+                                "printLong expects one argument");
+                        }
+
+                        const TypeRef argumentType = checkExpression(
+                            *expression.arguments[0],
+                            scopes,
+                            initialized,
+                            methods,
+                            fields,
+                            currentClass);
+
+                        if (argumentType.kind != Type::Long) {
+                            semanticError(
+                                expression.arguments[0]->location,
+                                "printLong argument must have type long (actual: " +
+                                typeName(argumentType) + ")");
+                        }
+
                         return TypeRef{Type::Void, {}};
                     }
 
@@ -405,8 +438,7 @@ namespace JAOT {
                             semanticError(
                                 statement.expression->location,
                                 "variable initializer must have type " +
-                                std::string(statement.declaredType.kind == Type::Int
-                                    ? "int" : "boolean") +
+                                typeName(statement.declaredType) +
                                 " (actual: " + typeName(initializerType) + ")"
                             );
                         }
@@ -657,7 +689,10 @@ namespace JAOT {
                     method.location,
                     method.returnType.kind == Type::Int
                         ? "int method must return a value"
-                        : "boolean method must return a value");
+                        : method.returnType.kind == Type::Long
+                        ? "long method must return a value"
+                        : "method returning " + typeName(method.returnType) +
+                          " must return a value");
             }
         }
     }
@@ -760,7 +795,9 @@ namespace JAOT {
     ) {
         for (const ClassDeclaration &declaration : program.classes) {
             for (const Method &method : declaration.methods) {
-                if (method.name == "printInt" || method.name == "printBool") {
+                if (method.name == "printInt" ||
+                    method.name == "printLong" ||
+                    method.name == "printBool") {
                     semanticError(
                         method.location,
                         "method name '" + method.name + "' is reserved"

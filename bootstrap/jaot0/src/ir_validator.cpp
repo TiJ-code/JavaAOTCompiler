@@ -10,10 +10,6 @@ namespace JAOT {
             throw std::runtime_error("invalid IR: " + message);
         }
 
-        bool isValueType(const TypeRef &type) {
-            return type.kind != Type::Void;
-        }
-
         void validateExpression(
             const IR::Expr &expression,
             const std::unordered_map<IR::LocalId, TypeRef> &locals,
@@ -24,6 +20,12 @@ namespace JAOT {
                 case IR::ExprKind::Integer:
                     if (expression.type.kind != Type::Int) {
                         invalid("integer expression has non-int type");
+                    }
+                    return;
+
+                case IR::ExprKind::LongInteger:
+                    if (expression.type.kind != Type::Long) {
+                        invalid("long integer expression has non-long type");
                     }
                     return;
 
