@@ -1,0 +1,17 @@
+class Main {
+    static short add(short left, short right) {
+        return left + right;
+    }
+
+    static void main() {
+        short value = add(20000s, 3000s);
+        printShort(value);
+        printShort(value + 10000s);
+        printShort(-32768s);
+        if (value > 22000s) {
+            printShort(1s);
+        } else {
+            printShort(0s);
+        }
+    }
+}

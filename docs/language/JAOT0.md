@@ -144,8 +144,8 @@ static ReturnType methodName(ParameterList) {
 }
 ```
 
-All methods are static. A method's parameter and return types may be `int`,
-`long`, `boolean`, or a class reference type. Methods are called without an
+All methods are static. A method's parameter and return types may be `short`,
+`int`, `long`, `boolean`, or a class reference type. Methods are called without an
 object receiver.
 
 ## 6. Entry Point
@@ -188,7 +188,21 @@ Integer values use signed 32-bit semantics. The valid literal range is
 `-2147483648` through `2147483647`. Addition, subtraction, and multiplication
 wrap modulo 2^32 when their mathematical result is outside that range.
 
-## 7.2 `long`
+## 7.2 `short`
+
+`short` is a signed 16-bit integer value.
+
+```java
+short count = 42s;
+```
+
+Short literals require an `S` or `s` suffix. The representable range is
+`-32768` through `32767`. `short`, `int`, and `long` are distinct types; JAOT0
+does not implicitly convert between them. Arithmetic and comparisons require
+matching numeric types. Short arithmetic wraps using two's-complement 16-bit
+semantics, and `printShort(short value)` prints a short value.
+
+## 7.3 `long`
 
 `long` is a signed 64-bit integer value.
 
@@ -278,7 +292,7 @@ String
 
 ## 8. Variables
 
-Local variables of type `int`, `long`, `boolean`, or a declared class reference type can
+Local variables of type `short`, `int`, `long`, `boolean`, or a declared class reference type can
 be declared inside methods. They may be declared with or without an initializer:
 
 ```java
@@ -338,7 +352,7 @@ enabled == false
 Expressions can contain:
 
 - integer literals
-- long literals
+- short and long literals
 - boolean literals
 - `null`
 - object allocation expressions
@@ -373,7 +387,8 @@ program abnormally. The otherwise-overflowing expression
 `-2147483648 / -1` evaluates to `-2147483648`.
 
 Arithmetic operators require both operands to have the same numeric type.
-Operations on `int` produce `int`; operations on `long` produce `long`.
+Operations on `short` produce `short`; operations on `int` produce `int`;
+operations on `long` produce `long`.
 Comparisons produce `boolean`. Logical operators require `boolean` operands.
 The otherwise-overflowing expression
 `-9223372036854775808L / -1L` evaluates to
@@ -401,7 +416,7 @@ Operator precedence, from highest to lowest:
 ```
 
 Operators at the same precedence level associate from left to right. Arithmetic
-operators require two operands of the same numeric type, `int` or `long`, and
+operators require two operands of the same numeric type, `short`, `int`, or `long`, and
 produce that type. Relational operators require two operands of the same numeric
 type and produce a `boolean`. Equality operators require two operands of the same
 type and produce a `boolean`: `int`, `long`, `boolean`, or the same
@@ -469,7 +484,7 @@ bytes to preserve the required stack alignment for calls.
 
 The prologue saves the caller's frame pointer, establishes the new `%rbp`, and
 reserves the aligned frame allocation. Methods return `int` and `boolean`
-results in `%eax`; `long` results are returned in `%rax`; boolean results use
+results in `%eax`; `short` results are returned in `%eax`; `long` results are returned in `%rax`; boolean results use
 the same `0`/`1` representation. Reference results are also returned in `%rax`.
 The epilogue uses `leave` and `ret`
 to restore the caller's frame and return address.
@@ -498,7 +513,7 @@ Instruction behavior is based on Intel's
 
 Object references occupy eight-byte slots in JAOT0's initial x86-64 backend.
 The slot stores a native object address; `null` is represented by zero. Object
-fields use four bytes for `int` and `boolean` values, eight bytes for `long`
+fields use two bytes for `short`, four bytes for `int` and `boolean` values, eight bytes for `long`
 values, and eight bytes for references. The object representation is an
 implementation detail except for these observable reference and default-value
 semantics.
@@ -511,6 +526,7 @@ Initially:
 
 ```java
 printInt(int value)
+printShort(short value)
 printLong(long value)
 printBool(boolean value)
 ```
@@ -536,7 +552,8 @@ false
 implemented by the program. They are supplied by the native runtime.
 
 `printBool` accepts only a `boolean` operand; passing an `int` is a semantic error.
-`printInt` accepts only an `int` operand. `long` values are printed with
+`printShort` accepts only a `short` operand. `printInt` accepts only an `int`
+operand. `long` values are printed with
 `printLong(long value)`.
 
 ## 15. Return Statements
@@ -553,7 +570,7 @@ A `void` method may use:
 return;
 ```
 
-Every `int`, `long`, and `boolean` method must return a value of its declared type on
+Every `short`, `int`, `long`, and `boolean` method must return a value of its declared type on
 every reachable path. A `void` method may either return with `return;` or reach
 the end of its body. A return expression must have exactly the declared return
 type; `void` methods cannot return a value.
@@ -698,6 +715,7 @@ static
 void
 int
 long
+short
 boolean
 true
 false
@@ -769,6 +787,7 @@ parameter
 
 type
     ::= "int"
+      | "short"
       | "long"
       | "boolean"
       | identifier
@@ -850,6 +869,7 @@ unary
 
 primary-expression
     ::= integer
+      | short-literal
       | long-literal
       | "true"
       | "false"
@@ -876,6 +896,9 @@ integer
 
 long-literal
     ::= digit+ ("L" | "l") ;
+
+short-literal
+    ::= digit+ ("S" | "s") ;
     
 identifier
     ::= (letter | "_") (letter | digit | "_")* ;
