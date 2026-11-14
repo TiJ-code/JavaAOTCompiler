@@ -144,8 +144,8 @@ static ReturnType methodName(ParameterList) {
 }
 ```
 
-All methods are static. A method's parameter and return types may be `short`,
-`int`, `long`, `boolean`, or a class reference type. Methods are called without an
+All methods are static. A method's parameter and return types may be `char`,
+`short`, `int`, `long`, `boolean`, or a class reference type. Methods are called without an
 object receiver.
 
 ## 6. Entry Point
@@ -202,7 +202,24 @@ does not implicitly convert between them. Arithmetic and comparisons require
 matching numeric types. Short arithmetic wraps using two's-complement 16-bit
 semantics, and `printShort(short value)` prints a short value.
 
-## 7.3 `long`
+## 7.3 `char`
+
+`char` is an unsigned 8-bit character value in the range `0` through `255`.
+Character literals use single quotes:
+
+```java
+char letter = 'A';
+char newline = '\n';
+char quote = '\'';
+```
+
+Supported escapes are `\0`, `\n`, `\r`, `\t`, `\\`, and `\'`. A character
+literal contains exactly one character or escape sequence. `char` is distinct
+from `short`, `int`, and `long`; JAOT0 does not implicitly convert between
+these types. Character arithmetic is not supported, but character equality and
+inequality are supported.
+
+## 7.4 `long`
 
 `long` is a signed 64-bit integer value.
 
@@ -292,7 +309,7 @@ String
 
 ## 8. Variables
 
-Local variables of type `short`, `int`, `long`, `boolean`, or a declared class reference type can
+Local variables of type `char`, `short`, `int`, `long`, `boolean`, or a declared class reference type can
 be declared inside methods. They may be declared with or without an initializer:
 
 ```java
@@ -352,7 +369,7 @@ enabled == false
 Expressions can contain:
 
 - integer literals
-- short and long literals
+- character, short, and long literals
 - boolean literals
 - `null`
 - object allocation expressions
@@ -513,7 +530,7 @@ Instruction behavior is based on Intel's
 
 Object references occupy eight-byte slots in JAOT0's initial x86-64 backend.
 The slot stores a native object address; `null` is represented by zero. Object
-fields use two bytes for `short`, four bytes for `int` and `boolean` values, eight bytes for `long`
+fields use one byte for `char`, two bytes for `short`, four bytes for `int` and `boolean` values, eight bytes for `long`
 values, and eight bytes for references. The object representation is an
 implementation detail except for these observable reference and default-value
 semantics.
@@ -525,13 +542,15 @@ JAOT0 provides a very small runtime interface.
 Initially:
 
 ```java
+printChar(char value)
 printInt(int value)
 printShort(short value)
 printLong(long value)
 printBool(boolean value)
 ```
 
-`printInt` and `printLong` print their numeric argument followed by a newline.
+`printChar` prints its character without adding a newline. `printInt` and
+`printLong` print their numeric argument followed by a newline.
 `printBool` prints either `true` or `false` followed by a newline.
 
 ```java
@@ -716,6 +735,7 @@ void
 int
 long
 short
+char
 boolean
 true
 false
@@ -871,6 +891,7 @@ primary-expression
     ::= integer
       | short-literal
       | long-literal
+      | character-literal
       | "true"
       | "false"
       | "null"
@@ -899,6 +920,10 @@ long-literal
 
 short-literal
     ::= digit+ ("S" | "s") ;
+
+character-literal
+    ::= "'" character "'"
+      | "'" escape-sequence "'" ;
     
 identifier
     ::= (letter | "_") (letter | digit | "_")* ;

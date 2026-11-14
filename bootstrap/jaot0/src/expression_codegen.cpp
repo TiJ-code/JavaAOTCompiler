@@ -23,6 +23,8 @@ namespace JAOT {
     ValueKind ExpressionLowerer::valueKind(const TypeRef &type) const {
         return type.kind == Type::Reference
                    ? ValueKind::Reference64
+                   : type.kind == Type::Char
+                   ? ValueKind::Char8
                    : type.kind == Type::Short
                    ? ValueKind::Int16
                    : type.kind == Type::Long
@@ -40,6 +42,9 @@ namespace JAOT {
         const IR::Expr &expression
     ) {
         switch (expression.kind) {
+            case IR::ExprKind::Character:
+                return machine_.emitCharConstant(expression.integer);
+
             case IR::ExprKind::Integer:
                 return machine_.emitIntConstant(expression.integer);
 
@@ -271,6 +276,8 @@ namespace JAOT {
                    ? ValueLocation::longInRax()
                    : expression.type.kind == Type::Short
                    ? ValueLocation::shortInEax()
+                   : expression.type.kind == Type::Char
+                   ? ValueLocation::charInEax()
                    : ValueLocation::intInEax();
     }
 } // namespace JAOT

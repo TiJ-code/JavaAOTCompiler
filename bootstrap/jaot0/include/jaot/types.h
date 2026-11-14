@@ -6,8 +6,9 @@
 
 namespace JAOT {
     enum class Type {
-        Int,
+        Char,
         Short,
+        Int,
         Long,
         Boolean,
         Reference,
@@ -53,6 +54,8 @@ namespace JAOT {
 
     inline std::string typeName(const TypeRef &type) {
         switch (type.kind) {
+            case Type::Char:
+                return "char";
             case Type::Int:
                 return "int";
             case Type::Short:

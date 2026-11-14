@@ -171,6 +171,12 @@ namespace JAOT {
                 lowered->location = expression.location;
 
                 switch (expression.kind) {
+                    case ExprKind::Character:
+                        lowered->kind = IR::ExprKind::Character;
+                        lowered->type = TypeRef{Type::Char, {}};
+                        lowered->integer = expression.integer;
+                        return lowered;
+
                     case ExprKind::Integer:
                         lowered->kind = IR::ExprKind::Integer;
                         lowered->type = TypeRef{Type::Int, {}};
@@ -311,6 +317,7 @@ namespace JAOT {
                         if (expression.callee == "printInt" ||
                             expression.callee == "printShort" ||
                             expression.callee == "printLong" ||
+                            expression.callee == "printChar" ||
                             expression.callee == "printBool") {
                             lowered->callee = MethodSignature{
                                 .name = expression.callee,
@@ -324,6 +331,8 @@ namespace JAOT {
                                             ? Type::Short
                                             : expression.callee == "printLong"
                                             ? Type::Long
+                                            : expression.callee == "printChar"
+                                            ? Type::Char
                                             : Type::Boolean,
                                         {}
                                     }
@@ -708,7 +717,9 @@ namespace JAOT {
                     .name = field.name,
                     .type = field.type,
                     .offset = offset,
-                    .size = field.type.kind == Type::Short
+                    .size = field.type.kind == Type::Char
+                        ? std::size_t{1}
+                        : field.type.kind == Type::Short
                         ? std::size_t{2}
                         : field.type.kind == Type::Reference ||
                             field.type.kind == Type::Long

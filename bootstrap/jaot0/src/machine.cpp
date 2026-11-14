@@ -9,6 +9,14 @@ namespace JAOT {
             "%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"
         };
 
+        constexpr std::array<const char *, 6> ArgumentRegisters8 = {
+            "%dil", "%sil", "%dl", "%cl", "%r8b", "%r9b"
+        };
+
+        static constexpr std::array<const char *, 6> ArgumentRegisters16 = {
+            "%di", "%si", "%dx", "%cx", "%r8w", "%r9w"
+        };
+
         constexpr std::array<const char *, 6> ArgumentRegisters32 = {
             "%edi", "%esi", "%edx", "%ecx", "%r8d", "%r9d"
         };
@@ -64,6 +72,11 @@ namespace JAOT {
         return stackDepth_;
     }
 
+    ValueLocation Machine::emitCharConstant(std::int64_t value) const {
+        out_ << "    movl $" << value << ", %eax\n";
+        return ValueLocation::charInEax();
+    }
+
     ValueLocation Machine::emitIntConstant(const std::int64_t value) const {
         out_ << "    movl $" << value << ", %eax\n";
         return ValueLocation::intInEax();
@@ -89,6 +102,10 @@ namespace JAOT {
     }
 
     ValueLocation Machine::loadFrameSlot(const int offset, const ValueKind kind) const {
+        if (kind == ValueKind::Char8) {
+            out_ << "    movzbl " << offset << "(%rbp), %eax\n";
+            return ValueLocation::charInEax();
+        }
         if (kind == ValueKind::Int16) {
             out_ << "    movswl " << offset << "(%rbp), %eax\n";
             return ValueLocation::shortInEax();
@@ -109,7 +126,9 @@ namespace JAOT {
             throw std::runtime_error("cannot store a stack-resident value directly into a frame slot");
         }
 
-        if (value.kind == ValueKind::Int16) {
+        if (value.kind == ValueKind::Char8) {
+            out_ << "    movb %al, ";
+        } else if (value.kind == ValueKind::Int16) {
             out_ << "    movw %ax, ";
         } else if (value.kind == ValueKind::Reference64 || value.kind == ValueKind::Int64) {
             out_ << "    movq %rax, ";
@@ -125,6 +144,10 @@ namespace JAOT {
             throw std::runtime_error("memory address must be a reference in %rax");
         }
 
+        if (kind == ValueKind::Char8) {
+            out_ << "    movzbl " << offset << "(%rax), %eax\n";
+            return ValueLocation::charInEax();
+        }
         if (kind == ValueKind::Int16) {
             out_ << "    movswl " << offset << "(%rax), %eax\n";
             return ValueLocation::shortInEax();
@@ -147,6 +170,18 @@ namespace JAOT {
 
         if (value.storage == ValueStorage::Stack) {
             throw std::runtime_error("cannot store a stack-resident value directly into memory");
+        }
+
+        if (value.kind == ValueKind::Char8) {
+            if (value.storage != ValueStorage::Eax &&
+                value.storage != ValueStorage::Ecx &&
+                value.storage != ValueStorage::Edx) {
+                throw std::runtime_error("char value is not in a supported register");
+            }
+
+            out_ << "    movb " << registerName(value)
+                 << ", " << offset << "(%rax)\n";
+            return;
         }
 
         if (value.kind == ValueKind::Int16) {
@@ -219,7 +254,9 @@ namespace JAOT {
             );
         }
 
-        return value.kind == ValueKind::Int16
+        return value.kind == ValueKind::Char8
+            ? ValueLocation::charInEcx()
+            : value.kind == ValueKind::Int16
             ? ValueLocation::shortInEcx()
             : ValueLocation::intInEcx();
     }
@@ -231,10 +268,11 @@ namespace JAOT {
             );
         }
 
+        if (kind == ValueKind::Char8) {
+            out_ << "    movb " << ArgumentRegisters8[index] << ", " << offset << "(%rbp)\n";
+            return;
+        }
         if (kind == ValueKind::Int16) {
-            static constexpr std::array<const char *, 6> ArgumentRegisters16 = {
-                "%di", "%si", "%dx", "%cx", "%r8w", "%r9w"
-            };
             out_ << "    movw " << ArgumentRegisters16[index] << ", "
                  << offset << "(%rbp)\n";
             return;
@@ -273,6 +311,10 @@ namespace JAOT {
 
         if (kind == ValueKind::Reference64) {
             return ValueLocation::referenceInRax();
+        }
+
+        if (kind == ValueKind::Char8) {
+            return ValueLocation::charInEax();
         }
 
         if (kind == ValueKind::Int64) {

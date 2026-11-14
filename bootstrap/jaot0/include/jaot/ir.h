@@ -13,6 +13,7 @@ namespace JAOT::IR {
     using BlockId = std::uint32_t;
 
     enum class ExprKind {
+        Character,
         Integer,
         ShortInteger,
         LongInteger,

@@ -23,6 +23,8 @@ namespace JAOT {
 
         Token identifierOrKeyword();
 
+        Token character();
+
         Token integer();
 
         void error(const std::string &message) const;

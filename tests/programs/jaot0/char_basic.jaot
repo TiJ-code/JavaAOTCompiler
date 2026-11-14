@@ -1,0 +1,17 @@
+class Main {
+    static char identity(char value) {
+        return value;
+    }
+
+    static void main() {
+        char letter = identity('A');
+        printChar(letter);
+        printChar('\n');
+
+        if (letter == 'A') {
+            printInt(1);
+        } else {
+            printInt(0);
+        }
+    }
+}

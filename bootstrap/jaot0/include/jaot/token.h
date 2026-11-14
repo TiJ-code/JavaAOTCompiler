@@ -8,6 +8,7 @@ namespace JAOT {
         EndOfFile,
 
         Identifier,
+        Character,
         Integer,
         ShortInteger,
         LongInteger,
@@ -15,6 +16,7 @@ namespace JAOT {
         KwClass,
         KwStatic,
         KwVoid,
+        KwChar,
         KwInt,
         KwShort,
         KwLong,

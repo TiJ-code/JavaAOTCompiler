@@ -10,6 +10,7 @@
 
 namespace JAOT {
     enum class ExprKind {
+        Character,
         Integer,
         ShortInteger,
         LongInteger,

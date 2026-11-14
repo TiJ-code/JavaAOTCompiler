@@ -11,6 +11,7 @@ namespace JAOT {
             {"class", TokenKind::KwClass},
             {"static", TokenKind::KwStatic},
             {"void", TokenKind::KwVoid},
+            {"char", TokenKind::KwChar},
             {"int", TokenKind::KwInt},
             {"short", TokenKind::KwShort},
             {"long", TokenKind::KwLong},
@@ -36,8 +37,12 @@ namespace JAOT {
             case TokenKind::Identifier:
                 return "identifier";
 
+            case TokenKind::Character:
+                return "character";
+
             case TokenKind::Integer:
                 return "integer";
+
             case TokenKind::ShortInteger:
                 return "short integer";
 
@@ -52,6 +57,9 @@ namespace JAOT {
 
             case TokenKind::KwVoid:
                 return "void";
+
+            case TokenKind::KwChar:
+                return "char";
 
             case TokenKind::KwInt:
                 return "int";
@@ -270,6 +278,57 @@ namespace JAOT {
         return {kind, text, startLine, startColumn};
     }
 
+    Token Lexer::character() {
+        const std::size_t startLine = line_;
+        const std::size_t startColumn = column_;
+
+        if (peek() == '\0' || peek() == '\n') {
+            error("unterminated character literal"); // char c = '
+        }
+
+        char value = advance();
+
+        if (value == '\\') {
+            if (peek() == '\0' || peek() == '\n') {
+                error("unterminated character literal"); // char c = '\\'
+            }
+
+            switch (advance()) {
+                case '0':
+                    value = '\0';
+                    break;
+                case 'n':
+                    value = '\n';
+                    break;
+                case 'r':
+                    value = '\r';
+                    break;
+                case 't':
+                    value = '\t';
+                    break;
+                case '\\':
+                    value = '\\';
+                    break;
+                case '\'':
+                    value = '\'';
+                    break;
+                default:
+                    error("unknown character escape");
+            }
+        }
+
+        if (!match('\'')) {
+            error("character literal must contain exactly one character");
+        }
+
+        return {
+            .kind = TokenKind::Character,
+            .text = std::string(1, value),
+            .line = startLine,
+            .column = startColumn
+        };
+    }
+
     Token Lexer::integer() {
         const std::size_t startLine = line_;
         const std::size_t startColumn = column_;
@@ -418,6 +477,10 @@ namespace JAOT {
                     } else {
                         error("unexpected character '|'");
                     }
+                    break;
+
+                case '\'':
+                    tokens.push_back(character());
                     break;
 
                 default:

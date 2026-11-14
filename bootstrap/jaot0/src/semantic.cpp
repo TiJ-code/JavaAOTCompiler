@@ -97,6 +97,9 @@ namespace JAOT {
             const std::string &currentClass
         ) {
             switch (expression.kind) {
+                case ExprKind::Character:
+                    return TypeRef{.kind = Type::Char, .className = {}};
+
                 case ExprKind::Integer:
                     return TypeRef{.kind = Type::Int, .className = {}};
 
@@ -206,6 +209,7 @@ namespace JAOT {
                         if (left.kind != right.kind ||
                             (left.kind != Type::Int &&
                              left.kind != Type::Short &&
+                             left.kind != Type::Char &&
                              left.kind != Type::Long &&
                              left.kind != Type::Boolean &&
                              left.kind != Type::Reference)) {
@@ -309,6 +313,34 @@ namespace JAOT {
                                 "printShort argument must have type short (actual: " +
                                 typeName(argumentType) + ")");
                         }
+                        return TypeRef{Type::Void, {}};
+                    }
+
+                    if (expression.callee == "printChar") {
+                        if (expression.arguments.size() != 1) {
+                            semanticError(
+                                expression.location,
+                                "printChar expects one argument"
+                            );
+                        }
+
+                        const TypeRef argumentType = checkExpression(
+                            *expression.arguments[0],
+                            scopes,
+                            initialized,
+                            methods,
+                            fields,
+                            currentClass
+                        );
+
+                        if (argumentType.kind != Type::Char) {
+                            semanticError(
+                                expression.arguments[0]->location,
+                                "printChar arguemnts must have type char (actual: " +
+                                typeName(argumentType) + ")"
+                            );
+                        }
+
                         return TypeRef{Type::Void, {}};
                     }
 
@@ -822,6 +854,7 @@ namespace JAOT {
                 if (method.name == "printInt" ||
                     method.name == "printShort" ||
                     method.name == "printLong" ||
+                    method.name == "printChar" ||
                     method.name == "printBool") {
                     semanticError(
                         method.location,

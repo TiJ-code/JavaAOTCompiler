@@ -5,6 +5,11 @@
 #include <cstdlib>
 
 extern "C"
+void jaot_print_char(const unsigned char value) {
+    std::printf("%c\n", value);
+}
+
+extern "C"
 void jaot_print_short(const short value) {
     std::printf("%hd\n", value);
 }

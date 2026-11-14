@@ -208,6 +208,13 @@ namespace JAOT {
             expression->kind = ExprKind::LongInteger;
             expression->integer = parseLiteral(token);
             expression->location = {token.line, token.column};
+        } else if (match(TokenKind::Character)) {
+            const Token &token = previous();
+
+            expression = std::make_unique<Expr>();
+            expression->kind = ExprKind::Character;
+            expression->integer = static_cast<unsigned char>(token.text[0]);
+            expression->location = {token.line, token.column};
         } else if (match(TokenKind::KwTrue) || match(TokenKind::KwFalse)) {
             const Token &token = previous();
 

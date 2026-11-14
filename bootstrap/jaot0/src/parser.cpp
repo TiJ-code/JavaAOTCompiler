@@ -40,6 +40,13 @@ namespace JAOT {
     ParsedType Parser::parseType(const bool allowVoid) {
         const Token &token = current();
 
+        if (match(TokenKind::KwChar)) {
+            return ParsedType {
+                .type = {.kind = Type::Char, .className = {}},
+                .location = {.line = token.line, .column = token.column}
+            };
+        }
+
         if (match(TokenKind::KwInt)) {
             return ParsedType {
                 .type = {.kind = Type::Int, .className = {}},

@@ -17,6 +17,12 @@ namespace JAOT {
             const std::unordered_map<std::string, MethodSignature> &methods
         ) {
             switch (expression.kind) {
+                case IR::ExprKind::Character:
+                    if (expression.type.kind != Type::Char) {
+                        invalid("character expression has non-char type");
+                    }
+                    return;
+
                 case IR::ExprKind::Integer:
                     if (expression.type.kind != Type::Int) {
                         invalid("integer expression has non-int type");
@@ -192,7 +198,12 @@ namespace JAOT {
 
             std::size_t expectedSize = 0;
             for (const IR::Field &field : classDeclaration.fields) {
-                if (field.size != 2 && field.size != 4 && field.size != 8) {
+                if (
+                    field.size != 1 &&
+                    field.size != 2 &&
+                    field.size != 4 &&
+                    field.size != 8
+                ) {
                     invalid("field has invalid size");
                 }
                 expectedSize += field.size;
