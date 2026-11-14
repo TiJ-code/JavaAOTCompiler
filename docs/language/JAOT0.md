@@ -15,6 +15,8 @@ JAOT0 source
 
 JAOT0 uses Java-like syntax, but it does not attempt to implement the Java language or JVM semantics.
 Control flow currently includes `if` and `while`; `while` is the only loop form.
+`break` exits the nearest enclosing `while`, and `continue` skips to the next
+condition check of the nearest enclosing `while`.
 The object model supports multiple classes, instance fields, reference values,
 and allocation, but not constructors, inheritance, or instance methods.
 
@@ -531,6 +533,8 @@ assignment
 expression statement
 if statement
 while statement
+break statement
+continue statement
 return statement
 ```
 
@@ -561,7 +565,14 @@ must have type `boolean` and is evaluated before every iteration. The body
 executes when the condition is `true`; when it is `false`, execution continues
 after the loop. The body is always a block and may contain nested blocks,
 `if` statements, and `while` statements. `while` is the only supported loop
-form; `for`, `do-while`, `break`, and `continue` are not supported.
+form; `for` and `do-while` are not supported.
+
+A `break` statement has the form `break;`. It terminates the nearest enclosing
+`while` loop and continues execution at the statement after that loop. A
+`continue` statement has the form `continue;`. It skips the remainder of the
+nearest enclosing loop body and evaluates that loop's condition again. Both
+statements are valid only inside a `while` body; using either statement outside
+a loop is a semantic error. Nested loops affect only the nearest enclosing loop.
 
 Every variable read must be definitely initialized on every path reaching the
 read. After an `if`/`else`, a variable is definitely initialized only if it is
@@ -660,6 +671,8 @@ return
 if
 else
 while
+break
+continue
 ```
 
 They cannot be used as identifiers.
@@ -741,6 +754,8 @@ statement
       | expression-statement
       | if-statement
       | while-statement
+      | break-statement
+      | continue-statement
       | return-statement;
 
 variable-declaration
@@ -759,6 +774,12 @@ if-statement
 
 while-statement
     ::= "while" "(" expression ")" block ;
+
+break-statement
+    ::= "break" ";" ;
+
+continue-statement
+    ::= "continue" ";" ;
 
 expression-statement
     ::= expression ";" ;

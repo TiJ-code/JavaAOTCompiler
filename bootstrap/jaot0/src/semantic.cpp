@@ -333,7 +333,8 @@ namespace JAOT {
             const FieldTable &fields,
             const Method &method,
             std::size_t &nextSymbolId,
-            const std::string &currentClass);
+            const std::string &currentClass,
+            std::size_t loopDepth);
 
         Flow analyzeBlock(
             const std::vector<Stmt> &statements,
@@ -343,11 +344,12 @@ namespace JAOT {
             const FieldTable &fields,
             const Method &method,
             std::size_t &nextSymbolId,
-            const std::string &currentClass) {
+            const std::string &currentClass,
+            std::size_t loopDepth) {
             scopes.emplace_back();
             flow = analyzeStatements(
                 statements, std::move(flow), scopes, methods, fields,
-                method, nextSymbolId, currentClass);
+                method, nextSymbolId, currentClass, loopDepth);
 
             for (const auto &[name, symbol] : scopes.back()) {
                 (void)name;
@@ -365,7 +367,8 @@ namespace JAOT {
             const FieldTable &fields,
             const Method &method,
             std::size_t &nextSymbolId,
-            const std::string &currentClass
+            const std::string &currentClass,
+            std::size_t loopDepth
         ) {
             if (!flow.fallsThrough) {
                 return flow;
@@ -526,7 +529,20 @@ namespace JAOT {
                 case StmtKind::Block:
                     return analyzeBlock(
                         statement.body, std::move(flow), scopes,
-                        methods, fields, method, nextSymbolId, currentClass);
+                        methods, fields, method, nextSymbolId,
+                        currentClass, loopDepth);
+
+                case StmtKind::Break:
+                case StmtKind::Continue:
+                    if (loopDepth == 0) {
+                        semanticError(
+                            statement.location,
+                            statement.kind == StmtKind::Break
+                                ? "'break' is only valid inside a while loop"
+                                : "'continue' is only valid inside a while loop");
+                    }
+                    flow.fallsThrough = false;
+                    return flow;
 
                 case StmtKind::If: {
                     const TypeRef conditionType = checkExpression(
@@ -541,13 +557,13 @@ namespace JAOT {
 
                     Flow thenFlow = analyzeBlock(
                         statement.body, flow, scopes, methods, fields,
-                        method, nextSymbolId, currentClass);
+                        method, nextSymbolId, currentClass, loopDepth);
                     Flow elseFlow = flow;
                     if (statement.hasElse) {
                         elseFlow = analyzeBlock(
                             statement.elseBody, std::move(elseFlow), scopes,
                             methods, fields, method, nextSymbolId,
-                            currentClass);
+                            currentClass, loopDepth);
                     }
 
                     if (thenFlow.fallsThrough && elseFlow.fallsThrough) {
@@ -583,7 +599,7 @@ namespace JAOT {
 
                     (void)analyzeBlock(
                         statement.body, flow, scopes, methods, fields,
-                        method, nextSymbolId, currentClass);
+                        method, nextSymbolId, currentClass, loopDepth + 1);
 
                     return flow;
                 }
@@ -600,11 +616,12 @@ namespace JAOT {
             const FieldTable &fields,
             const Method &method,
             std::size_t &nextSymbolId,
-            const std::string &currentClass) {
+            const std::string &currentClass,
+            std::size_t loopDepth) {
             for (const Stmt &statement : statements) {
                 flow = analyzeStatement(
                     statement, std::move(flow), scopes, methods, fields,
-                    method, nextSymbolId, currentClass);
+                    method, nextSymbolId, currentClass, loopDepth);
             }
             return flow;
         }
@@ -633,7 +650,7 @@ namespace JAOT {
 
             flow = analyzeStatements(
                 method.body, std::move(flow), scopes, methods, fields,
-                method, nextSymbolId, currentClass);
+                method, nextSymbolId, currentClass, 0);
 
             if (method.returnType.kind != Type::Void && flow.fallsThrough) {
                 semanticError(

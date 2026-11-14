@@ -510,6 +510,36 @@ namespace JAOT {
                         return;
                     }
 
+                    case StmtKind::Break:
+                        if (breakTargets_.empty()) {
+                            loweringError(
+                                "'break' is only valid inside a while loop");
+                        }
+
+                        block(*currentBlock_).terminator.kind =
+                            IR::TerminatorKind::Jump;
+                        block(*currentBlock_).terminator.location =
+                            statement.location;
+                        block(*currentBlock_).terminator.target =
+                            breakTargets_.back();
+                        currentBlock_.reset();
+                        return;
+
+                    case StmtKind::Continue:
+                        if (continueTargets_.empty()) {
+                            loweringError(
+                                "'continue' is only valid inside a while loop");
+                        }
+
+                        block(*currentBlock_).terminator.kind =
+                            IR::TerminatorKind::Jump;
+                        block(*currentBlock_).terminator.location =
+                            statement.location;
+                        block(*currentBlock_).terminator.target =
+                            continueTargets_.back();
+                        currentBlock_.reset();
+                        return;
+
                     case StmtKind::Block:
                         lowerScopedStatements(statement.body);
                         return;
@@ -579,8 +609,15 @@ namespace JAOT {
                         branch.trueTarget = bodyId;
                         branch.falseTarget = exitId;
 
+                        breakTargets_.push_back(exitId);
+                        continueTargets_.push_back(conditionId);
+
                         currentBlock_ = bodyId;
                         lowerScopedStatements(statement.body);
+
+                        continueTargets_.pop_back();
+                        breakTargets_.pop_back();
+
                         if (currentBlock_) {
                             IR::Terminator &backJump = block(*currentBlock_).terminator;
                             backJump.kind = IR::TerminatorKind::Jump;
@@ -603,6 +640,8 @@ namespace JAOT {
             IR::Method result_;
             std::vector<std::unordered_map<std::string, IR::LocalId>> scopes_;
             std::optional<IR::BlockId> currentBlock_;
+            std::vector<IR::BlockId> breakTargets_;
+            std::vector<IR::BlockId> continueTargets_;
         };
     }
 

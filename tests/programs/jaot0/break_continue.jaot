@@ -1,0 +1,21 @@
+class Main {
+    static void main() {
+        int count = 0;
+
+        while (count < 5) {
+            count = count + 1;
+
+            if (count == 2) {
+                continue;
+            }
+
+            if (count == 4) {
+                break;
+            }
+
+            printInt(count);
+        }
+
+        printInt(99);
+    }
+}

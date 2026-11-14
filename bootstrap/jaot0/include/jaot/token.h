@@ -19,6 +19,8 @@ namespace JAOT {
         KwFalse,
         KwReturn,
         KwWhile,
+        KwBreak,
+        KwContinue,
         KwNull,
         KwNew,
 

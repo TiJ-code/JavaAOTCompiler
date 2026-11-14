@@ -34,6 +34,14 @@ namespace JAOT {
             return parseWhile();
         }
 
+        if (match(TokenKind::KwBreak)) {
+            return parseBreak();
+        }
+
+        if (match(TokenKind::KwContinue)) {
+            return parseContinue();
+        }
+
         if (check(TokenKind::LBrace)) {
             Stmt statement;
             statement.kind = StmtKind::Block;
@@ -190,6 +198,34 @@ namespace JAOT {
         consume(TokenKind::RParen, "expected ')' after condition");
         statement.body = parseBlock();
 
+        return statement;
+    }
+
+    Stmt Parser::parseBreak() {
+        const auto &breakToken = previous();
+
+        Stmt statement;
+        statement.kind = StmtKind::Break;
+        statement.location = {
+            .line = breakToken.line,
+            .column = breakToken.column
+        };
+
+        consume(TokenKind::Semicolon, "expected ';' after 'break'");
+        return statement;
+    }
+
+    Stmt Parser::parseContinue() {
+        const auto &continueToken = previous();
+
+        Stmt statement;
+        statement.kind = StmtKind::Continue;
+        statement.location = {
+            .line = continueToken.line,
+            .column = continueToken.column
+        };
+
+        consume(TokenKind::Semicolon, "expected ';' after 'continue'");
         return statement;
     }
 } // namespace JAOT

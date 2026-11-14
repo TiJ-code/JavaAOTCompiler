@@ -49,6 +49,8 @@ namespace JAOT {
         Block,
         If,
         While,
+        Break,
+        Continue,
     };
 
     struct Stmt {
@@ -140,6 +142,10 @@ namespace JAOT {
         Stmt parseIf();
 
         Stmt parseWhile();
+
+        Stmt parseBreak();
+
+        Stmt parseContinue();
 
         std::unique_ptr<Expr> parseExpression();
 
