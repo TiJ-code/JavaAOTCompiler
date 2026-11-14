@@ -18,6 +18,7 @@ namespace JAOT {
 
     Stmt Parser::parseStatement() {
         if (check(TokenKind::KwChar) ||
+            check(TokenKind::KwByte) ||
             check(TokenKind::KwInt) ||
             check(TokenKind::KwShort) ||
             check(TokenKind::KwLong) ||

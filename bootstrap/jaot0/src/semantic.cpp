@@ -100,6 +100,9 @@ namespace JAOT {
                 case ExprKind::Character:
                     return TypeRef{.kind = Type::Char, .className = {}};
 
+                case ExprKind::ByteInteger:
+                    return TypeRef{.kind = Type::Byte, .className = {}};
+
                 case ExprKind::Integer:
                     return TypeRef{.kind = Type::Int, .className = {}};
 
@@ -172,7 +175,8 @@ namespace JAOT {
                         expression.op == "*" || expression.op == "/") {
                         if (left.kind != right.kind ||
                             (left.kind != Type::Int &&
-                             left.kind != Type::Short &&
+                            left.kind != Type::Byte &&
+                            left.kind != Type::Short &&
                              left.kind != Type::Long)) {
                             semanticError(
                                 expression.location,
@@ -186,7 +190,8 @@ namespace JAOT {
                         expression.op == ">" || expression.op == ">=") {
                         if (left.kind != right.kind ||
                             (left.kind != Type::Int &&
-                             left.kind != Type::Short &&
+                            left.kind != Type::Byte &&
+                            left.kind != Type::Short &&
                              left.kind != Type::Long)) {
                             semanticError(
                                 expression.location,
@@ -208,7 +213,8 @@ namespace JAOT {
 
                         if (left.kind != right.kind ||
                             (left.kind != Type::Int &&
-                             left.kind != Type::Short &&
+                            left.kind != Type::Byte &&
+                            left.kind != Type::Short &&
                              left.kind != Type::Char &&
                              left.kind != Type::Long &&
                              left.kind != Type::Boolean &&
@@ -304,6 +310,7 @@ namespace JAOT {
                                 expression.location,
                                 "printShort expects one argument");
                         }
+
                         const TypeRef argumentType = checkExpression(
                             *expression.arguments[0], scopes, initialized,
                             methods, fields, currentClass);
@@ -311,6 +318,22 @@ namespace JAOT {
                             semanticError(
                                 expression.arguments[0]->location,
                                 "printShort argument must have type short (actual: " +
+                                typeName(argumentType) + ")");
+                        }
+                        return TypeRef{Type::Void, {}};
+                    }
+
+                    if (expression.callee == "printByte") {
+                        if (expression.arguments.size() != 1) {
+                            semanticError(expression.location, "printByte expects one argument");
+                        }
+                        const TypeRef argumentType = checkExpression(
+                            *expression.arguments[0], scopes, initialized,
+                            methods, fields, currentClass);
+                        if (argumentType.kind != Type::Byte) {
+                            semanticError(
+                                expression.arguments[0]->location,
+                                "printByte argument must have type byte (actual: " +
                                 typeName(argumentType) + ")");
                         }
                         return TypeRef{Type::Void, {}};
@@ -855,6 +878,7 @@ namespace JAOT {
                     method.name == "printShort" ||
                     method.name == "printLong" ||
                     method.name == "printChar" ||
+                    method.name == "printByte" ||
                     method.name == "printBool") {
                     semanticError(
                         method.location,

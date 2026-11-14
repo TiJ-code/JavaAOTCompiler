@@ -12,6 +12,7 @@ namespace JAOT {
             {"static", TokenKind::KwStatic},
             {"void", TokenKind::KwVoid},
             {"char", TokenKind::KwChar},
+            {"byte", TokenKind::KwByte},
             {"int", TokenKind::KwInt},
             {"short", TokenKind::KwShort},
             {"long", TokenKind::KwLong},
@@ -43,6 +44,9 @@ namespace JAOT {
             case TokenKind::Integer:
                 return "integer";
 
+            case TokenKind::ByteInteger:
+                return "byte integer";
+
             case TokenKind::ShortInteger:
                 return "short integer";
 
@@ -60,6 +64,9 @@ namespace JAOT {
 
             case TokenKind::KwChar:
                 return "char";
+
+            case TokenKind::KwByte:
+                return "byte";
 
             case TokenKind::KwInt:
                 return "int";
@@ -341,7 +348,10 @@ namespace JAOT {
 
         TokenKind kind = TokenKind::Integer;
 
-        if (peek() == 'S' || peek() == 's') {
+        if (peek() == 'B' || peek() == 'b') {
+            text += advance();
+            kind = TokenKind::ByteInteger;
+        } else if (peek() == 'S' || peek() == 's') {
             text += advance();
             kind = TokenKind::ShortInteger;
         } else if (peek() == 'L' || peek() == 'l') {

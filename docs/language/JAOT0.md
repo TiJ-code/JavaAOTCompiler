@@ -145,7 +145,7 @@ static ReturnType methodName(ParameterList) {
 ```
 
 All methods are static. A method's parameter and return types may be `char`,
-`short`, `int`, `long`, `boolean`, or a class reference type. Methods are called without an
+`byte`, `short`, `int`, `long`, `boolean`, or a class reference type. Methods are called without an
 object receiver.
 
 ## 6. Entry Point
@@ -188,7 +188,21 @@ Integer values use signed 32-bit semantics. The valid literal range is
 `-2147483648` through `2147483647`. Addition, subtraction, and multiplication
 wrap modulo 2^32 when their mathematical result is outside that range.
 
-## 7.2 `short`
+## 7.2 `byte`
+
+`byte` is a signed 8-bit integer value.
+
+```java
+byte count = 42b;
+```
+
+Byte literals require a `B` or `b` suffix and range from `-128` through `127`.
+Byte arithmetic and comparisons use matching byte operands and wrap using
+two's-complement 8-bit semantics. `byte` is distinct from `char`, `short`,
+`int`, and `long`; JAOT0 does not implicitly convert between them.
+`printByte(byte value)` prints a byte value.
+
+## 7.3 `short`
 
 `short` is a signed 16-bit integer value.
 
@@ -202,7 +216,7 @@ does not implicitly convert between them. Arithmetic and comparisons require
 matching numeric types. Short arithmetic wraps using two's-complement 16-bit
 semantics, and `printShort(short value)` prints a short value.
 
-## 7.3 `char`
+## 7.4 `char`
 
 `char` is an unsigned 8-bit character value in the range `0` through `255`.
 Character literals use single quotes:
@@ -543,13 +557,15 @@ Initially:
 
 ```java
 printChar(char value)
+printByte(byte value)
 printInt(int value)
 printShort(short value)
 printLong(long value)
 printBool(boolean value)
 ```
 
-`printChar` prints its character without adding a newline. `printInt` and
+`printChar` prints its character without adding a newline. `printByte`,
+`printInt`, and
 `printLong` print their numeric argument followed by a newline.
 `printBool` prints either `true` or `false` followed by a newline.
 
@@ -807,6 +823,7 @@ parameter
 
 type
     ::= "int"
+      | "byte"
       | "short"
       | "long"
       | "boolean"
@@ -815,6 +832,8 @@ type
 
 value-type
     ::= "int"
+      | "byte"
+      | "short"
       | "long"
       | "boolean"
       | identifier;
@@ -889,6 +908,7 @@ unary
 
 primary-expression
     ::= integer
+      | byte-literal
       | short-literal
       | long-literal
       | character-literal
@@ -920,6 +940,9 @@ long-literal
 
 short-literal
     ::= digit+ ("S" | "s") ;
+
+byte-literal
+    ::= digit+ ("B" | "b") ;
 
 character-literal
     ::= "'" character "'"

@@ -10,6 +10,7 @@ namespace JAOT {
         Identifier,
         Character,
         Integer,
+        ByteInteger,
         ShortInteger,
         LongInteger,
 
@@ -17,6 +18,7 @@ namespace JAOT {
         KwStatic,
         KwVoid,
         KwChar,
+        KwByte,
         KwInt,
         KwShort,
         KwLong,

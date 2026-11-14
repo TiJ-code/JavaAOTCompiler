@@ -23,6 +23,12 @@ namespace JAOT {
                     }
                     return;
 
+                case IR::ExprKind::ByteInteger:
+                    if (expression.type.kind != Type::Byte) {
+                        invalid("byte integer expression has non-byte type");
+                    }
+                    return;
+
                 case IR::ExprKind::Integer:
                     if (expression.type.kind != Type::Int) {
                         invalid("integer expression has non-int type");

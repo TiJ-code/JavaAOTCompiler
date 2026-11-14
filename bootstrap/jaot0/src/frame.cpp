@@ -12,6 +12,9 @@ namespace JAOT {
         if (type.kind == Type::Char) {
             return 1;
         }
+        if (type.kind == Type::Byte) {
+            return 1;
+        }
         return type.kind == Type::Reference || type.kind == Type::Long ? 8 : 4;
     }
 

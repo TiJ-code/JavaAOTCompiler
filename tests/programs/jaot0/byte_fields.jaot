@@ -1,0 +1,12 @@
+class Box {
+    byte value;
+}
+
+class Main {
+    static void main() {
+        Box box = new Box();
+        printByte(box.value);
+        box.value = -1b;
+        printByte(box.value);
+    }
+}

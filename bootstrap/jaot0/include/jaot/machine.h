@@ -9,6 +9,7 @@ namespace JAOT {
 
     enum class ValueKind {
         Char8,
+        Int8,
         Int32,
         Int16,
         Int64,
@@ -33,8 +34,16 @@ namespace JAOT {
             return ValueLocation{ .kind = ValueKind::Char8, .storage = ValueStorage::Eax };
         }
 
+        static ValueLocation byteInEax() {
+            return ValueLocation{ .kind = ValueKind::Int8, .storage = ValueStorage::Eax };
+        }
+
         static ValueLocation charInEcx() {
             return ValueLocation{ .kind = ValueKind::Char8, .storage = ValueStorage::Ecx };
+        }
+
+        static ValueLocation byteInEcx() {
+            return ValueLocation{ .kind = ValueKind::Int8, .storage = ValueStorage::Ecx };
         }
 
         static ValueLocation intInEax() {
@@ -101,6 +110,7 @@ namespace JAOT {
         int stackDepth() const;
 
         [[nodiscard]] ValueLocation emitCharConstant(std::int64_t value) const;
+        ValueLocation emitByteConstant(std::int64_t value) const;
         ValueLocation emitIntConstant(std::int64_t value) const;
         ValueLocation emitShortConstant(std::int64_t value) const;
         ValueLocation emitLongConstant(std::int64_t value) const;

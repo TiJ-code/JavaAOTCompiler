@@ -8,18 +8,22 @@
 namespace JAOT {
     namespace {
         int64_t parseLiteral(const Token &token, const bool negative = false) {
+            const bool isByte = token.kind == TokenKind::ByteInteger;
             const bool isShort = token.kind == TokenKind::ShortInteger;
             const bool isLong = token.kind == TokenKind::LongInteger;
 
             try {
                 std::string digits = token.text;
 
-                if (isShort || isLong) {
+                if (isByte || isShort || isLong) {
                     digits.pop_back();
                 }
 
                 const unsigned long long magnitude = std::stoull(digits);
-                const auto maxPositive = isShort
+                const auto maxPositive = isByte
+                    ? static_cast<unsigned long long>(
+                        std::numeric_limits<int8_t>::max())
+                    : isShort
                     ? static_cast<unsigned long long>(
                         std::numeric_limits<int16_t>::max())
                     : isLong
@@ -34,9 +38,11 @@ namespace JAOT {
                 }
 
                 if (negative &&
-                    (isShort || isLong) &&
+                    (isByte || isShort || isLong) &&
                     magnitude == maxNegativeMagnitude) {
-                    return isShort
+                    return isByte
+                        ? std::numeric_limits<int8_t>::min()
+                        : isShort
                         ? std::numeric_limits<int16_t>::min()
                         : std::numeric_limits<int64_t>::min();
                 }
@@ -47,7 +53,9 @@ namespace JAOT {
                 throw std::runtime_error(
                     "parser error at " + std::to_string(token.line) + ":" +
                     std::to_string(token.column) +
-                    (isShort
+                    (isByte
+                        ? ": byte integer literal out of 8-bit range"
+                        : isShort
                         ? ": short integer literal out of 16-bit range"
                         : isLong
                         ? ": long integer literal out of 64-bit range"
@@ -155,13 +163,16 @@ namespace JAOT {
             const Token minusToken = previous();
 
             if (check(TokenKind::Integer) ||
+                check(TokenKind::ByteInteger) ||
                 check(TokenKind::ShortInteger) ||
                 check(TokenKind::LongInteger)) {
                 const Token token = current();
                 ++index_;
 
                 auto expression = std::make_unique<Expr>();
-                expression->kind = token.kind == TokenKind::ShortInteger
+                expression->kind = token.kind == TokenKind::ByteInteger
+                    ? ExprKind::ByteInteger
+                    : token.kind == TokenKind::ShortInteger
                     ? ExprKind::ShortInteger
                     : token.kind == TokenKind::LongInteger
                     ? ExprKind::LongInteger
@@ -193,6 +204,12 @@ namespace JAOT {
 
             expression = std::make_unique<Expr>();
             expression->kind = ExprKind::Integer;
+            expression->integer = parseLiteral(token);
+            expression->location = {token.line, token.column};
+        } else if (match(TokenKind::ByteInteger)) {
+            const Token &token = previous();
+            expression = std::make_unique<Expr>();
+            expression->kind = ExprKind::ByteInteger;
             expression->integer = parseLiteral(token);
             expression->location = {token.line, token.column};
         } else if (match(TokenKind::ShortInteger)) {

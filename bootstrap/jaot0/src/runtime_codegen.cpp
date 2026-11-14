@@ -16,6 +16,10 @@ namespace JAOT {
             if (value.kind != ValueKind::Char8) {
                 throw std::runtime_error("printChar requires a char value");
             }
+        } else if (name == "printByte") {
+            if (value.kind != ValueKind::Int8) {
+                throw std::runtime_error("printByte requires a byte value");
+            }
         } else if (name == "printShort") {
             if (value.kind != ValueKind::Int16) {
                 throw std::runtime_error("printShort requires a short value");
@@ -35,6 +39,8 @@ namespace JAOT {
         machine_.prepareArgument(value, 0);
         if (name == "printChar") {
             machine_.call("jaot_print_char");
+        } else if (name == "printByte") {
+            machine_.call("jaot_print_byte");
         } else if (name == "printShort") {
             machine_.call("jaot_print_short");
         } else if (name == "printLong") {

@@ -57,6 +57,8 @@ namespace JAOT {
                             ? ValueKind::Int16
                             : frame_.type(parameter).kind == Type::Char
                             ? ValueKind::Char8
+                            : frame_.type(parameter).kind == Type::Byte
+                            ? ValueKind::Int8
                             : frame_.type(parameter).kind == Type::Long
                             ? ValueKind::Int64
                             : ValueKind::Int32

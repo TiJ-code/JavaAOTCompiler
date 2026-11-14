@@ -25,6 +25,8 @@ namespace JAOT {
                    ? ValueKind::Reference64
                    : type.kind == Type::Char
                    ? ValueKind::Char8
+                   : type.kind == Type::Byte
+                   ? ValueKind::Int8
                    : type.kind == Type::Short
                    ? ValueKind::Int16
                    : type.kind == Type::Long
@@ -44,6 +46,8 @@ namespace JAOT {
         switch (expression.kind) {
             case IR::ExprKind::Character:
                 return machine_.emitCharConstant(expression.integer);
+            case IR::ExprKind::ByteInteger:
+                return machine_.emitByteConstant(expression.integer);
 
             case IR::ExprKind::Integer:
                 return machine_.emitIntConstant(expression.integer);
@@ -191,6 +195,8 @@ namespace JAOT {
                 ? ValueLocation::longInRax()
                 : expression.type.kind == Type::Short
                 ? ValueLocation::shortInEax()
+                : expression.type.kind == Type::Byte
+                ? ValueLocation::byteInEax()
                 : ValueLocation::intInEax();
         }
 
@@ -274,6 +280,8 @@ namespace JAOT {
                    ? ValueLocation::referenceInRax()
                    : expression.type.kind == Type::Long
                    ? ValueLocation::longInRax()
+                   : expression.type.kind == Type::Byte
+                   ? ValueLocation::byteInEax()
                    : expression.type.kind == Type::Short
                    ? ValueLocation::shortInEax()
                    : expression.type.kind == Type::Char

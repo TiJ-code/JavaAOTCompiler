@@ -177,6 +177,12 @@ namespace JAOT {
                         lowered->integer = expression.integer;
                         return lowered;
 
+                    case ExprKind::ByteInteger:
+                        lowered->kind = IR::ExprKind::ByteInteger;
+                        lowered->type = TypeRef{Type::Byte, {}};
+                        lowered->integer = expression.integer;
+                        return lowered;
+
                     case ExprKind::Integer:
                         lowered->kind = IR::ExprKind::Integer;
                         lowered->type = TypeRef{Type::Int, {}};
@@ -281,10 +287,11 @@ namespace JAOT {
                             if (lowered->left->type.kind !=
                                     lowered->right->type.kind ||
                                 (lowered->left->type.kind != Type::Int &&
+                                 lowered->left->type.kind != Type::Byte &&
                                  lowered->left->type.kind != Type::Short &&
                                 lowered->left->type.kind != Type::Long)) {
                                 loweringError(
-                                    "arithmetic operators require matching int or long operands");
+                                    "arithmetic operators require matching numeric operands");
                             }
                         } else if (lowered->left->type.kind !=
                                        lowered->right->type.kind) {
@@ -315,6 +322,7 @@ namespace JAOT {
                         lowered->kind = IR::ExprKind::Call;
 
                         if (expression.callee == "printInt" ||
+                        expression.callee == "printByte" ||
                             expression.callee == "printShort" ||
                             expression.callee == "printLong" ||
                             expression.callee == "printChar" ||
@@ -327,6 +335,8 @@ namespace JAOT {
                                     TypeRef{
                                         expression.callee == "printInt"
                                             ? Type::Int
+                                            : expression.callee == "printByte"
+                                            ? Type::Byte
                                             : expression.callee == "printShort"
                                             ? Type::Short
                                             : expression.callee == "printLong"
@@ -717,7 +727,8 @@ namespace JAOT {
                     .name = field.name,
                     .type = field.type,
                     .offset = offset,
-                    .size = field.type.kind == Type::Char
+                    .size = field.type.kind == Type::Char ||
+                        field.type.kind == Type::Byte
                         ? std::size_t{1}
                         : field.type.kind == Type::Short
                         ? std::size_t{2}

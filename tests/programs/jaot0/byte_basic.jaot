@@ -1,0 +1,21 @@
+class Main {
+    static byte identity(byte value) {
+        return value;
+    }
+
+    static void main() {
+        byte low = identity(-128b);
+        byte high = identity(127B);
+        byte wrapped = 100b + 30b;
+
+        printByte(low);
+        printByte(high);
+        printByte(wrapped);
+
+        if (low < high) {
+            printInt(1);
+        } else {
+            printInt(0);
+        }
+    }
+}

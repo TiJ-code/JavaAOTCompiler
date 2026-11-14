@@ -1,0 +1,29 @@
+class Main {
+    static byte byteValue(byte value) {
+        return value + 1b;
+    }
+
+    static short shortValue(short value) {
+        return value + 1s;
+    }
+
+    static int intValue(int value) {
+        return value + 1;
+    }
+
+    static long longValue(long value) {
+        return value + 1L;
+    }
+
+    static void main() {
+        byte byteResult = byteValue(126b);
+        short shortResult = shortValue(32766s);
+        int intResult = intValue(2147483646);
+        long longResult = longValue(9223372036854775806L);
+
+        printByte(byteResult);
+        printShort(shortResult);
+        printInt(intResult);
+        printLong(longResult);
+    }
+}

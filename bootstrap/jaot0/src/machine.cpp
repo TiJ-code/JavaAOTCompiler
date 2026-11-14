@@ -44,6 +44,20 @@ namespace JAOT {
             );
         }
 
+        const char *registerName8(const ValueLocation value) {
+            switch (value.storage) {
+                case ValueStorage::Eax:
+                    return "%al";
+                case ValueStorage::Ecx:
+                    return "%cl";
+                case ValueStorage::Edx:
+                    return "%dl";
+                default:
+                    throw std::runtime_error(
+                        "byte-sized value has no supported register name");
+            }
+        }
+
     }
 
     Machine::Machine(std::ostream &out) : out_(out) {}
@@ -77,6 +91,11 @@ namespace JAOT {
         return ValueLocation::charInEax();
     }
 
+    ValueLocation Machine::emitByteConstant(std::int64_t value) const {
+        out_ << "    movl $" << value << ", %eax\n";
+        return ValueLocation::byteInEax();
+    }
+
     ValueLocation Machine::emitIntConstant(const std::int64_t value) const {
         out_ << "    movl $" << value << ", %eax\n";
         return ValueLocation::intInEax();
@@ -106,6 +125,10 @@ namespace JAOT {
             out_ << "    movzbl " << offset << "(%rbp), %eax\n";
             return ValueLocation::charInEax();
         }
+        if (kind == ValueKind::Int8) {
+            out_ << "    movsbl " << offset << "(%rbp), %eax\n";
+            return ValueLocation::byteInEax();
+        }
         if (kind == ValueKind::Int16) {
             out_ << "    movswl " << offset << "(%rbp), %eax\n";
             return ValueLocation::shortInEax();
@@ -128,6 +151,8 @@ namespace JAOT {
 
         if (value.kind == ValueKind::Char8) {
             out_ << "    movb %al, ";
+        } else if (value.kind == ValueKind::Int8) {
+            out_ << "    movb %al, ";
         } else if (value.kind == ValueKind::Int16) {
             out_ << "    movw %ax, ";
         } else if (value.kind == ValueKind::Reference64 || value.kind == ValueKind::Int64) {
@@ -147,6 +172,10 @@ namespace JAOT {
         if (kind == ValueKind::Char8) {
             out_ << "    movzbl " << offset << "(%rax), %eax\n";
             return ValueLocation::charInEax();
+        }
+        if (kind == ValueKind::Int8) {
+            out_ << "    movsbl " << offset << "(%rax), %eax\n";
+            return ValueLocation::byteInEax();
         }
         if (kind == ValueKind::Int16) {
             out_ << "    movswl " << offset << "(%rax), %eax\n";
@@ -179,7 +208,18 @@ namespace JAOT {
                 throw std::runtime_error("char value is not in a supported register");
             }
 
-            out_ << "    movb " << registerName(value)
+            out_ << "    movb " << registerName8(value)
+                 << ", " << offset << "(%rax)\n";
+            return;
+        }
+
+        if (value.kind == ValueKind::Int8) {
+            if (value.storage != ValueStorage::Eax &&
+                value.storage != ValueStorage::Ecx &&
+                value.storage != ValueStorage::Edx) {
+                throw std::runtime_error("byte value is not in a supported register");
+            }
+            out_ << "    movb " << registerName8(value)
                  << ", " << offset << "(%rax)\n";
             return;
         }
@@ -256,6 +296,8 @@ namespace JAOT {
 
         return value.kind == ValueKind::Char8
             ? ValueLocation::charInEcx()
+            : value.kind == ValueKind::Int8
+            ? ValueLocation::byteInEcx()
             : value.kind == ValueKind::Int16
             ? ValueLocation::shortInEcx()
             : ValueLocation::intInEcx();
@@ -270,6 +312,11 @@ namespace JAOT {
 
         if (kind == ValueKind::Char8) {
             out_ << "    movb " << ArgumentRegisters8[index] << ", " << offset << "(%rbp)\n";
+            return;
+        }
+        if (kind == ValueKind::Int8) {
+            out_ << "    movb " << ArgumentRegisters8[index] << ", "
+                 << offset << "(%rbp)\n";
             return;
         }
         if (kind == ValueKind::Int16) {
@@ -315,6 +362,10 @@ namespace JAOT {
 
         if (kind == ValueKind::Char8) {
             return ValueLocation::charInEax();
+        }
+
+        if (kind == ValueKind::Int8) {
+            return ValueLocation::byteInEax();
         }
 
         if (kind == ValueKind::Int64) {
@@ -424,6 +475,11 @@ namespace JAOT {
         if (kind == ValueKind::Int16) {
             emitBinaryIntOperation(operation);
             out_ << "    movswl %ax, %eax\n";
+            return;
+        }
+        if (kind == ValueKind::Int8) {
+            emitBinaryIntOperation(operation);
+            out_ << "    movsbl %al, %eax\n";
             return;
         }
         if (kind != ValueKind::Int64) {

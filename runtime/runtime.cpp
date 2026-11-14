@@ -10,6 +10,11 @@ void jaot_print_char(const unsigned char value) {
 }
 
 extern "C"
+void jaot_print_byte(const signed char value) {
+    std::printf("%hhd\n", value);
+}
+
+extern "C"
 void jaot_print_short(const short value) {
     std::printf("%hd\n", value);
 }

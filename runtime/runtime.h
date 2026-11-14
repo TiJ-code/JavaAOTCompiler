@@ -9,6 +9,7 @@ void *jaot_allocate(std::size_t size);
 void jaot_null_dereference();
 
 void jaot_print_char(unsigned char value);
+void jaot_print_byte(signed char value);
 void jaot_print_short(short value);
 void jaot_print_int(int value);
 void jaot_print_long(long long value);
