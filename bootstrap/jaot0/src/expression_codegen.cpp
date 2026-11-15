@@ -21,7 +21,7 @@ namespace JAOT {
     }
 
     ValueKind ExpressionLowerer::valueKind(const TypeRef &type) const {
-        return type.kind == Type::Reference
+        return isReferenceType(type)
                    ? ValueKind::Reference64
                    : type.kind == Type::Char
                    ? ValueKind::Char8
@@ -74,6 +74,21 @@ namespace JAOT {
                 return runtime_.allocate(found->second.size);
             }
 
+            case IR::ExprKind::NewArray: {
+                if (!expression.right) {
+                    throw std::runtime_error(
+                        "array allocation has no length"
+                    );
+                }
+
+                const ValueLocation length = lower(*expression.right);
+
+                return runtime_.allocateArray(
+                    length,
+                    expression.elementSize
+                );
+            }
+
             case IR::ExprKind::Local:
                 return machine_.loadFrameSlot(
                     frame_.offset(expression.local),
@@ -82,6 +97,9 @@ namespace JAOT {
 
             case IR::ExprKind::FieldAccess:
                 return lowerFieldAccess(expression);
+
+            case IR::ExprKind::ArrayAccess:
+                return lowerArrayAccess(expression);
 
             case IR::ExprKind::Unary:
                 return lowerUnary(expression);
@@ -113,6 +131,32 @@ namespace JAOT {
         return machine_.loadMemory(
             receiver,
             static_cast<int>(expression.fieldOffset),
+            valueKind(expression.type)
+        );
+    }
+
+    ValueLocation ExpressionLowerer::lowerArrayAccess(
+        const IR::Expr &expression
+    ) {
+        if (!expression.left || !expression.right) {
+            throw std::runtime_error(
+                "incomplete IR array access"
+            );
+        }
+
+        const ValueLocation index = lower(*expression.right);
+        const ValueLocation savedIndex = machine_.saveForLater(index);
+        const ValueLocation array = lower(*expression.left);
+
+        const ValueLocation address = runtime_.arrayElement(
+            array,
+            savedIndex,
+            expression.elementSize
+        );
+
+        return machine_.loadMemory(
+            address,
+            0,
             valueKind(expression.type)
         );
     }
@@ -276,7 +320,7 @@ namespace JAOT {
         machine_.collectArguments(expression.arguments.size());
         machine_.call("jaot_" + methodSymbol(method->second));
 
-        return expression.type.kind == Type::Reference
+        return isReferenceType(expression.type)
                    ? ValueLocation::referenceInRax()
                    : expression.type.kind == Type::Long
                    ? ValueLocation::longInRax()

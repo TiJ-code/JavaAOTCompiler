@@ -1,0 +1,6 @@
+class Main {
+    static void main() {
+        int[] values = null;
+        printInt(values[0]);
+    }
+}

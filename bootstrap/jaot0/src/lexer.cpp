@@ -122,6 +122,12 @@ namespace JAOT {
             case TokenKind::RParen:
                 return ")";
 
+            case TokenKind::LBracket:
+                return "[";
+
+            case TokenKind::RBracket:
+                return "]";
+
             case TokenKind::Semicolon:
                 return ";";
 
@@ -411,6 +417,14 @@ namespace JAOT {
 
                 case ')':
                     tokens.push_back({TokenKind::RParen, ")", line, column});
+                    break;
+
+                case '[':
+                    tokens.push_back({TokenKind::LBracket, "[", line, column});
+                    break;
+
+                case ']':
+                    tokens.push_back({TokenKind::RBracket, "]", line, column});
                     break;
 
                 case ';':

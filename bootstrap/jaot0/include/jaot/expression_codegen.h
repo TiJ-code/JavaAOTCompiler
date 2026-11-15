@@ -28,6 +28,7 @@ namespace JAOT {
         [[nodiscard]] ValueKind valueKind(const TypeRef &type) const;
 
         ValueLocation lowerFieldAccess(const IR::Expr &expression);
+        ValueLocation lowerArrayAccess(const IR::Expr &expression);
         ValueLocation lowerUnary(const IR::Expr &expression);
         ValueLocation lowerBinary(const IR::Expr &expression);
         ValueLocation lowerCall(const IR::Expr &expression);

@@ -393,9 +393,38 @@ namespace JAOT {
         }
 
         if (value.kind == ValueKind::Reference64 || value.kind == ValueKind::Int64) {
-            out_ << "    movq %rax, " << ArgumentRegisters[index] << "\n";
+            if (value.storage != ValueStorage::Rax &&
+                value.storage != ValueStorage::Rcx &&
+                value.storage != ValueStorage::Rdx) {
+                throw std::runtime_error("64-bit argument is not in a supported register");
+            }
+            out_ << "    movq " << registerName(value) << ", "
+                 << ArgumentRegisters[index] << "\n";
+        } else if (value.kind == ValueKind::Char8 ||
+                   value.kind == ValueKind::Int8) {
+            out_ << "    movb " << registerName8(value) << ", "
+                 << ArgumentRegisters8[index] << "\n";
+        } else if (value.kind == ValueKind::Int16) {
+            const char *source = value.storage == ValueStorage::Eax
+                ? "%ax"
+                : value.storage == ValueStorage::Ecx
+                ? "%cx"
+                : value.storage == ValueStorage::Edx
+                ? "%dx"
+                : nullptr;
+            if (source == nullptr) {
+                throw std::runtime_error("16-bit argument is not in a supported register");
+            }
+            out_ << "    movw " << source << ", "
+                 << ArgumentRegisters16[index] << "\n";
         } else {
-            out_ << "    movl %eax, " << ArgumentRegisters32[index] << "\n";
+            if (value.storage != ValueStorage::Eax &&
+                value.storage != ValueStorage::Ecx &&
+                value.storage != ValueStorage::Edx) {
+                throw std::runtime_error("32-bit argument is not in a supported register");
+            }
+            out_ << "    movl " << registerName(value) << ", "
+                 << ArgumentRegisters32[index] << "\n";
         }
     }
 

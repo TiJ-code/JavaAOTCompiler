@@ -88,6 +88,40 @@ namespace JAOT {
             return found == classFields->second.end() ? nullptr : &found->second;
         }
 
+        void validateDeclaredType(
+            const TypeRef &type,
+            const std::unordered_set<std::string> &classNames,
+            const SourceLocation location,
+            const std::string &errorPrefix
+        ) {
+            if (type.kind == Type::Reference) {
+                if (!type.className.empty() &&
+                    !classNames.contains(type.className)) {
+                    semanticError(
+                        location,
+                        errorPrefix + ": " + type.className
+                    );
+                }
+                return;
+            }
+
+            if (type.kind == Type::Array) {
+                if (!type.elementType) {
+                    semanticError(
+                        location,
+                        errorPrefix + ": invalid array type"
+                    );
+                }
+
+                validateDeclaredType(
+                    *type.elementType,
+                    classNames,
+                    location,
+                    errorPrefix
+                );
+            }
+        }
+
         TypeRef checkExpression(
             const Expr &expression,
             const Scopes &scopes,
@@ -120,6 +154,42 @@ namespace JAOT {
 
                 case ExprKind::NewObject:
                     return TypeRef{.kind = Type::Reference, .className = expression.className};
+
+                case ExprKind::NewArray: {
+                    if (!expression.right) {
+                        semanticError(expression.location, "array allocation has no length");
+                    }
+
+                    if (expression.arrayElementType.kind == Type::Void ||
+                        expression.arrayElementType.kind == Type::Array) {
+                        semanticError(
+                            expression.location,
+                            "invalid array element type"
+                        );
+                    }
+
+                    const TypeRef lengthType = checkExpression(
+                        *expression.right,
+                        scopes,
+                        initialized,
+                        methods,
+                        fields,
+                        currentClass
+                    );
+
+                    if (lengthType.kind != Type::Int) {
+                        semanticError(
+                            expression.right->location,
+                            "array length must have type int"
+                        );
+                    }
+
+                    return TypeRef {
+                        .kind = Type::Array,
+                        .className = {},
+                        .elementType = std::make_shared<TypeRef>(expression.arrayElementType)
+                    };
+                }
 
                 case ExprKind::Variable: {
                     const Symbol *symbol = findSymbol(scopes, expression.name);
@@ -163,6 +233,46 @@ namespace JAOT {
                     return field->type;
                 }
 
+                case ExprKind::ArrayAccess: {
+                    if (!expression.left || !expression.right) {
+                        semanticError(expression.location, "incomplete array access");
+                    }
+
+                    const TypeRef arrayType = checkExpression(
+                        *expression.left,
+                        scopes,
+                        initialized,
+                        methods,
+                        fields,
+                        currentClass
+                    );
+
+                    if (arrayType.kind != Type::Array || !arrayType.elementType) {
+                        semanticError(
+                            expression.location,
+                            "indexing requires an array"
+                        );
+                    }
+
+                    const TypeRef indexType = checkExpression(
+                        *expression.right,
+                        scopes,
+                        initialized,
+                        methods,
+                        fields,
+                        currentClass
+                    );
+
+                    if (indexType.kind != Type::Int) {
+                        semanticError(
+                            expression.right->location,
+                            "array index must have type int"
+                        );
+                    }
+
+                    return *arrayType.elementType;
+                }
+
                 case ExprKind::Binary: {
                     const TypeRef left = checkExpression(
                         *expression.left, scopes, initialized, methods, fields,
@@ -202,27 +312,27 @@ namespace JAOT {
                     }
 
                     if (expression.op == "==" || expression.op == "!=") {
-                        if (!isAssignable(left, right) &&
-                            !isAssignable(right, left)) {
+                        const bool leftReference = isReferenceType(left);
+                        const bool rightReference = isReferenceType(right);
+
+                        if (leftReference || rightReference) {
+                                if (!leftReference ||
+                                    !rightReference ||
+                                    (!isAssignable(left, right) &&
+                                     !isAssignable(right, left))) {
+                                    semanticError(
+                                        expression.location,
+                                        "equality operands must have compatible reference types (left: " +
+                                        typeName(left) + ", right: " +
+                                        typeName(right) + ")"
+                                    );
+                                }
+                        } else if (!sameType(left, right)) {
                                 semanticError(
                                     expression.location,
-                                    "equality operands must have the same reference type or be null (left: " +
+                                    "equality operands must have the same value type (left: " +
                                     typeName(left) + ", right: " + typeName(right) + ")"
                                 );
-                        }
-
-                        if (left.kind != right.kind ||
-                            (left.kind != Type::Int &&
-                            left.kind != Type::Byte &&
-                            left.kind != Type::Short &&
-                             left.kind != Type::Char &&
-                             left.kind != Type::Long &&
-                             left.kind != Type::Boolean &&
-                             left.kind != Type::Reference)) {
-                            semanticError(
-                                expression.location,
-                                "equality operands must have the same value type (left: " +
-                                typeName(left) + ", right: " + typeName(right) + ")");
                         }
                         return TypeRef{Type::Boolean, {}};
                     }
@@ -504,7 +614,9 @@ namespace JAOT {
                             currentClass);
 
                         if (statement.declaredType.kind == Type::Reference) {
-                            if (!isAssignable(initializerType, statement.declaredType)) {
+                            if (!isAssignable(
+                                    initializerType,
+                                    statement.declaredType)) {
                                 semanticError(
                                     statement.expression->location,
                                     "reference initializer must have type '" +
@@ -513,7 +625,9 @@ namespace JAOT {
                                     typeName(initializerType) + ")"
                                 );
                             }
-                        } else if (!sameType(initializerType, statement.declaredType)) {
+                        } else if (!isAssignable(
+                                       initializerType,
+                                       statement.declaredType)) {
                             semanticError(
                                 statement.expression->location,
                                 "variable initializer must have type " +
@@ -550,12 +664,13 @@ namespace JAOT {
                                     statement.expression->location,
                                     "reference assignment must match the field type or be null (expected: " +
                                     typeName(targetType) + ", actual: " +
-                                    typeName(valueType) + ")");
+                                    typeName(valueType) + ")"
+                                );
                             }
-                        } else if (!sameType(valueType, targetType)) {
+                        } else if (!isAssignable(valueType, targetType)) {
                             semanticError(
                                 statement.expression->location,
-                                "assignment value must have the same type as its target (expected: " +
+                                "assignment value must have type " +
                                 typeName(targetType) + ", actual: " +
                                 typeName(valueType) + ")");
                         }
@@ -578,10 +693,10 @@ namespace JAOT {
                                 typeName(valueType) + ")"
                             );
                         }
-                    } else if (!sameType(valueType, symbol->type)) {
+                    } else if (!isAssignable(valueType, symbol->type)) {
                         semanticError(
                             statement.expression->location,
-                            "assignment value must have the same type as its target (expected: " +
+                            "assignment value must have type " +
                             typeName(symbol->type) + ", actual: " +
                             typeName(valueType) + ")"
                         );
@@ -622,14 +737,17 @@ namespace JAOT {
                                 semanticError(
                                     statement.expression->location,
                                     "return expression must have type '" +
-                                        method.returnType.className +
-                                        "' or null (actual: " +
-                                        typeName(returnType) + ")");
+                                    method.returnType.className +
+                                    "' or null (actual: " +
+                                    typeName(returnType) + ")"
+                                );
                             }
-                        } else if (!sameType(returnType, method.returnType)) {
+                        } else if (!isAssignable(
+                                       returnType,
+                                       method.returnType)) {
                             semanticError(
                                 statement.expression->location,
-                                "return expression must have the method's declared type (expected: " +
+                                "return expression must have type " +
                                 typeName(method.returnType) + ", actual: " +
                                 typeName(returnType) + ")");
                         }
@@ -803,22 +921,20 @@ namespace JAOT {
     ) {
         for (const ClassDeclaration &declaration : program.classes) {
             for (const Method &method : declaration.methods) {
-                if (method.returnType.kind == Type::Reference &&
-                    !context.classNames.contains(method.returnType.className)) {
-                    semanticError(
-                        method.location,
-                        "unknown return type: " + method.returnType.className
-                    );
-                }
+                validateDeclaredType(
+                    method.returnType,
+                    context.classNames,
+                    method.location,
+                    "unknown return type"
+                );
 
                 for (const Parameter &parameter : method.parameters) {
-                    if (parameter.type.kind == Type::Reference &&
-                            !context.classNames.contains(parameter.type.className)) {
-                        semanticError(
-                            parameter.location,
-                            "unknown parameter type: " + parameter.type.className
-                        );
-                    }
+                    validateDeclaredType(
+                        parameter.type,
+                        context.classNames,
+                        parameter.location,
+                        "unknown parameter type"
+                    );
                 }
             }
         }
@@ -853,13 +969,12 @@ namespace JAOT {
                     );
                 }
 
-                if (field.type.kind == Type::Reference &&
-                    !context.classNames.contains(field.type.className)) {
-                    semanticError(
-                        field.location,
-                        "unknown field: " + field.type.className
-                    );
-                }
+                validateDeclaredType(
+                    field.type,
+                    context.classNames,
+                    field.location,
+                    "unknown field"
+                );
 
                 context.fields[declaration.name].emplace(
                     field.name,

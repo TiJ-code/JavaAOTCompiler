@@ -39,6 +39,8 @@ namespace JAOT {
         RBrace,
         LParen,
         RParen,
+        LBracket,
+        RBracket,
         Semicolon,
         Comma,
         Dot,

@@ -1,0 +1,6 @@
+class Main {
+    static void main() {
+        int[] values = new int[1];
+        values[1] = 10;
+    }
+}

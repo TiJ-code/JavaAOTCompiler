@@ -1,0 +1,7 @@
+class Main {
+    static void main() {
+        int[] values = new int[1];
+        boolean[] flags = new boolean[1];
+        values = flags;
+    }
+}

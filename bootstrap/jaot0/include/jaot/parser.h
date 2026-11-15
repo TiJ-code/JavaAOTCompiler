@@ -18,8 +18,10 @@ namespace JAOT {
         Boolean,
         Null,
         NewObject,
+        NewArray,
         Variable,
         FieldAccess,
+        ArrayAccess,
         Binary,
         Unary,
         Call,
@@ -37,6 +39,8 @@ namespace JAOT {
         std::string callee;
         std::string calleeClass;
         std::string className;
+
+        TypeRef arrayElementType;
 
         std::vector<std::unique_ptr<Expr> > arguments;
 

@@ -21,8 +21,10 @@ namespace JAOT::IR {
         Boolean,
         Null,
         NewObject,
+        NewArray,
         Local,
         FieldAccess,
+        ArrayAccess,
         Unary,
         Binary,
         Call,
@@ -37,6 +39,8 @@ namespace JAOT::IR {
         bool boolean = false;
         LocalId local = 0;
         std::string className;
+        TypeRef elementType;
+        std::size_t elementSize = 0;
         std::size_t fieldOffset = 0;
 
         std::string binaryOperator;
@@ -62,6 +66,7 @@ namespace JAOT::IR {
     enum class StatementKind {
         AssignLocal,
         AssignField,
+        AssignArray,
         Evaluate,
     };
 

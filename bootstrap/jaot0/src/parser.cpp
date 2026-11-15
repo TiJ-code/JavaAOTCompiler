@@ -40,71 +40,73 @@ namespace JAOT {
     ParsedType Parser::parseType(const bool allowVoid) {
         const Token &token = current();
 
+        TypeRef type {
+            .kind = Type::Int,
+            .className = {},
+            .elementType = nullptr
+        };
+
         if (match(TokenKind::KwChar)) {
-            return ParsedType {
-                .type = {.kind = Type::Char, .className = {}},
-                .location = {.line = token.line, .column = token.column}
-            };
-        }
-
-        if (match(TokenKind::KwByte)) {
-            return ParsedType {
-                .type = {.kind = Type::Byte, .className = {}},
-                .location = {.line = token.line, .column = token.column}
-            };
-        }
-
-        if (match(TokenKind::KwInt)) {
-            return ParsedType {
-                .type = {.kind = Type::Int, .className = {}},
-                .location = {.line = token.line, .column = token.column}
-            };
-        }
-
-        if (match(TokenKind::KwShort)) {
-            return ParsedType {
-                .type = {.kind = Type::Short, .className = {}},
-                .location = {.line = token.line, .column = token.column}
-            };
-        }
-
-        if (match(TokenKind::KwLong)) {
-            return ParsedType {
-                .type = {.kind = Type::Long, .className = {}},
-                .location = {.line = token.line, .column = token.column}
-            };
-        }
-
-        if (match(TokenKind::KwBoolean)) {
-            return ParsedType {
-                .type = {.kind = Type::Boolean, .className = {}},
-                .location = {.line = token.line, .column = token.column}
-            };
-        }
-
-        if (check(TokenKind::KwVoid)) {
+            type.kind = Type::Char;
+        } else if (match(TokenKind::KwByte)) {
+            type.kind = Type::Byte;
+        } else if (match(TokenKind::KwShort)) {
+            type.kind = Type::Short;
+        } else if (match(TokenKind::KwInt)) {
+            type.kind = Type::Int;
+        } else if (match(TokenKind::KwLong)) {
+            type.kind = Type::Long;
+        } else if (match(TokenKind::KwBoolean)) {
+            type.kind = Type::Boolean;
+        } else if (check(TokenKind::KwVoid)) {
             if (!allowVoid) {
                 error("'void' is only valid as a method return type");
             }
 
             match(TokenKind::KwVoid);
-
-            return ParsedType {
-                .type = {.kind = Type::Void, .className = {}},
-                .location = {.line = token.line, .column = token.column}
-            };
-        }
-
-        if (check(TokenKind::Identifier)) {
+            type.kind = Type::Void;
+        } else if (check(TokenKind::Identifier)) {
             const Token &classToken = consume(TokenKind::Identifier, "expected type");
 
-            return ParsedType {
-                .type = {.kind = Type::Reference, .className = classToken.text},
-                .location = {.line = classToken.line, .column = classToken.column}
+            type.kind = Type::Reference;
+            type.className = classToken.text;
+        } else {
+            error("expected type");
+        }
+
+        if (type.kind == Type::Void && check(TokenKind::LBracket)) {
+            error("'void' cannot be used as an array element type");
+        }
+
+        /*
+         * consume empty [] paris here.
+         *
+         * parsing for declarations:
+         *  - int[] values;
+         *  - int[][] matrix;
+         *
+         *  does not consume [10], because [10] belongs to
+         *  `new int[10]` and is parsed by parsePrimary().
+         */
+        while (
+            check(TokenKind::LBracket) &&
+            index_ + 1 < tokens_.size() &&
+            tokens_[index_ + 1].kind == TokenKind::RBracket
+        ) {
+            ++index_; // [
+            ++index_; // ]
+
+            type = TypeRef {
+                .kind = Type::Array,
+                .className = {},
+                .elementType = std::make_shared<TypeRef>(std::move(type))
             };
         }
 
-        error("expected type");
+        return ParsedType {
+            .type = std::move(type),
+            .location = {.line = token.line, .column = token.column}
+        };
     }
 
     Program Parser::parse() {

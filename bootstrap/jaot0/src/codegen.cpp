@@ -51,7 +51,7 @@ namespace JAOT {
                     machine_.storeArgumentInFrame(
                         i,
                         frame_.offset(parameter),
-                        frame_.type(parameter).kind == Type::Reference
+                        isReferenceType(frame_.type(parameter))
                             ? ValueKind::Reference64
                             : frame_.type(parameter).kind == Type::Short
                             ? ValueKind::Int16
@@ -138,6 +138,47 @@ namespace JAOT {
                             static_cast<int>(target.fieldOffset),
                             savedValue
                         );
+
+                        return;
+                    }
+
+                    case IR::StatementKind::AssignArray: {
+                        if (
+                            !statement.targetExpression ||
+                            statement.targetExpression->kind != IR::ExprKind::ArrayAccess ||
+                            !statement.targetExpression->left ||
+                            !statement.targetExpression->right ||
+                            !statement.expression
+                        ) {
+                            throw std::runtime_error(
+                                "incomplete IR array assignment"
+                            );
+                        }
+
+                        const IR::Expr &target = *statement.targetExpression;
+
+                        const ValueLocation index = expressions.lower(*target.right);
+                        const ValueLocation savedIndex =
+                            machine_.saveForLater(index);
+                        const ValueLocation array =
+                            expressions.lower(*target.left);
+
+                        const ValueLocation address =
+                            runtime_.arrayElement(
+                                array,
+                                savedIndex,
+                                target.elementSize
+                            );
+                        machine_.push(address);
+
+                        const ValueLocation value =
+                            expressions.lower(*statement.expression);
+                        const ValueLocation savedValue =
+                            machine_.saveForLater(value);
+                        const ValueLocation restoredAddress =
+                            machine_.pop(ValueKind::Reference64);
+
+                        machine_.storeMemory(restoredAddress, 0, savedValue);
 
                         return;
                     }

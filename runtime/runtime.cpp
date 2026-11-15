@@ -3,6 +3,63 @@
 #include <cstdio>
 
 #include <cstdlib>
+#include <limits>
+
+namespace {
+    struct ArrayHeader {
+        std::size_t length;
+        std::size_t elementSize;
+    };
+}
+
+extern "C"
+void *jaot_array_allocate(std::size_t length, std::size_t elementSize) {
+    if (elementSize != 1 &&
+        elementSize != 2 &&
+        elementSize != 4 &&
+        elementSize != 8) {
+        std::abort();
+    }
+
+    if (length > (std::numeric_limits<std::size_t>::max() - sizeof(ArrayHeader)) / elementSize) {
+        std::abort();
+    }
+
+    const std::size_t bytes = sizeof(ArrayHeader) + length * elementSize;
+
+    auto *header = static_cast<ArrayHeader *>(std::calloc(1, bytes));
+
+    if (header == nullptr) {
+        std::abort();
+    }
+
+    header->length = length;
+    header->elementSize = elementSize;
+
+    return header + 1;
+}
+
+extern "C"
+void *jaot_array_element(void *array, std::int64_t index, std::size_t elementSize) {
+    if (array == nullptr) {
+        jaot_null_dereference();
+    }
+
+    auto *header = static_cast<ArrayHeader *>(array) - 1;
+
+    if (header->elementSize != elementSize ||
+        index < 0 ||
+        static_cast<std::uint64_t>(index) >= header->length) {
+        jaot_array_bounds_failure();
+    }
+
+    return static_cast<unsigned char *>(array) + static_cast<std::size_t>(index) * elementSize;
+}
+
+extern "C"
+void jaot_array_bounds_failure() {
+    std::abort();
+}
 
 extern "C"
 void jaot_print_char(const unsigned char value) {

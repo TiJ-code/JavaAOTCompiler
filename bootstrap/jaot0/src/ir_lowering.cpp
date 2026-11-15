@@ -20,6 +20,31 @@ namespace JAOT {
             throw std::runtime_error("IR lowering error: " + message);
         }
 
+        std::size_t typeSize(const TypeRef &type) {
+            switch (type.kind) {
+                case Type::Char:
+                case Type::Byte:
+                    return 1;
+
+                case Type::Short:
+                    return 2;
+
+                case Type::Int:
+                case Type::Boolean:
+                    return 4;
+
+                case Type::Long:
+                case Type::Reference:
+                case Type::Array:
+                    return 8;
+
+                case Type::Void:
+                    loweringError("void has no storage size");
+            }
+
+            loweringError("unknown type size");
+        }
+
         class MethodLowerer {
         public:
             MethodLowerer(
@@ -223,6 +248,35 @@ namespace JAOT {
                         lowered->className = expression.className;
                         return lowered;
 
+                    case ExprKind::NewArray:
+                        if (!expression.right) {
+                            loweringError("array allocation has no length");
+                        }
+
+                        if (expression.arrayElementType.kind == Type::Void ||
+                            expression.arrayElementType.kind == Type::Array) {
+                            loweringError("invalid array element type");
+                        }
+
+                        lowered->kind = IR::ExprKind::NewArray;
+                        lowered->right = lowerExpression(*expression.right);
+
+                        if (lowered->right->type.kind != Type::Int) {
+                            loweringError("array length must have type int");
+                        }
+
+                        lowered->elementType = expression.arrayElementType;
+                        lowered->elementSize =
+                            typeSize(expression.arrayElementType);
+                        lowered->type = TypeRef{
+                            .kind = Type::Array,
+                            .className = {},
+                            .elementType = std::make_shared<TypeRef>(
+                                expression.arrayElementType
+                            )
+                        };
+                        return lowered;
+
                     case ExprKind::Variable:
                         lowered->kind = IR::ExprKind::Local;
                         lowered->local = findLocal(expression.name);
@@ -275,6 +329,36 @@ namespace JAOT {
 
                         return lowered;
                     }
+
+                    case ExprKind::ArrayAccess:
+                        if (!expression.left || !expression.right) {
+                            loweringError("incomplete array access");
+                        }
+
+                        lowered->kind = IR::ExprKind::ArrayAccess;
+                        lowered->left =
+                            lowerExpression(*expression.left);
+                        lowered->right =
+                            lowerExpression(*expression.right);
+
+                        if (lowered->left->type.kind != Type::Array ||
+                            !lowered->left->type.elementType) {
+                            loweringError(
+                                "array access requires an array expression"
+                            );
+                        }
+
+                        if (lowered->right->type.kind != Type::Int) {
+                            loweringError(
+                                "array index must have type int"
+                            );
+                        }
+
+                        lowered->type =
+                            *lowered->left->type.elementType;
+                        lowered->elementType = lowered->type;
+                        lowered->elementSize = typeSize(lowered->type);
+                        return lowered;
 
                     case ExprKind::Binary:
                         lowered->kind = IR::ExprKind::Binary;
@@ -499,7 +583,11 @@ namespace JAOT {
                     case StmtKind::Assignment: {
                         if (statement.assignmentTarget) {
                             IR::Statement assignment;
-                            assignment.kind = IR::StatementKind::AssignField;
+                            assignment.kind =
+                                statement.assignmentTarget->kind ==
+                                    ExprKind::ArrayAccess
+                                    ? IR::StatementKind::AssignArray
+                                    : IR::StatementKind::AssignField;
                             assignment.location = statement.location;
                             assignment.targetExpression = lowerExpression(*statement.assignmentTarget);
                             assignment.expression = lowerExpression(*statement.expression);
@@ -733,6 +821,7 @@ namespace JAOT {
                         : field.type.kind == Type::Short
                         ? std::size_t{2}
                         : field.type.kind == Type::Reference ||
+                            field.type.kind == Type::Array ||
                             field.type.kind == Type::Long
                         ? std::size_t{8}
                         : std::size_t{4}

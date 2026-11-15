@@ -55,4 +55,32 @@ namespace JAOT {
     void RuntimeEmitter::failNullDereference() const {
         machine_.call("jaot_null_dereference");
     }
+
+    ValueLocation RuntimeEmitter::allocateArray(
+        const ValueLocation length,
+        const std::size_t elementSize
+    ) const {
+        machine_.prepareArgument(length, 0);
+        machine_.emitIntConstant(static_cast<std::int64_t>(elementSize));
+        machine_.prepareArgument(ValueLocation::intInEax(), 1);
+        machine_.call("jaot_array_allocate");
+        return ValueLocation::referenceInRax();
+    }
+
+    ValueLocation RuntimeEmitter::arrayElement(
+        const ValueLocation array,
+        const ValueLocation index,
+        const std::size_t elementSize
+    ) const {
+        machine_.prepareArgument(array, 0);
+        machine_.prepareArgument(index, 1);
+
+        machine_.emitIntConstant(
+            static_cast<std::int64_t>(elementSize)
+        );
+        machine_.prepareArgument(ValueLocation::intInEax(), 2);
+
+        machine_.call("jaot_array_element");
+        return ValueLocation::referenceInRax();
+    }
 }

@@ -58,10 +58,29 @@ namespace JAOT {
         if (check(TokenKind::Identifier)) {
             std::size_t lookahead = index_ + 1;
 
-            while (lookahead + 1 < tokens_.size() &&
-                   tokens_[lookahead].kind == TokenKind::Dot &&
-                   tokens_[lookahead + 1].kind == TokenKind::Identifier) {
-                lookahead += 2;
+            while (lookahead < tokens_.size()) {
+                if (tokens_[lookahead].kind == TokenKind::Dot &&
+                    lookahead + 1 < tokens_.size() &&
+                    tokens_[lookahead + 1].kind == TokenKind::Identifier) {
+                    lookahead += 2;
+                    continue;
+                }
+
+                if (tokens_[lookahead].kind == TokenKind::LBracket) {
+                    std::size_t depth = 1;
+                    ++lookahead;
+                    while (lookahead < tokens_.size() && depth != 0) {
+                        if (tokens_[lookahead].kind == TokenKind::LBracket) {
+                            ++depth;
+                        } else if (tokens_[lookahead].kind == TokenKind::RBracket) {
+                            --depth;
+                        }
+                        ++lookahead;
+                    }
+                    continue;
+                }
+
+                break;
             }
 
             if (lookahead + 1 < tokens_.size() &&
@@ -116,16 +135,37 @@ namespace JAOT {
         target->name = identifier.text;
         target->location = { .line = identifier.line, .column = identifier.column };
 
-        while (match(TokenKind::Dot)) {
-            const Token field =
-                consume(TokenKind::Identifier, "expected field name after '.'");
+        while (true) {
+            if (match(TokenKind::Dot)) {
+                const Token field =
+                    consume(TokenKind::Identifier, "expected field name after '.'");
 
-            auto access = std::make_unique<Expr>();
-            access->kind = ExprKind::FieldAccess;
-            access->name = field.text;
-            access->location = { .line = field.line, .column = identifier.column };
-            access->left = std::move(target);
-            target = std::move(access);
+                auto access = std::make_unique<Expr>();
+                access->kind = ExprKind::FieldAccess;
+                access->name = field.text;
+                access->location = { .line = field.line, .column = identifier.column };
+                access->left = std::move(target);
+                target = std::move(access);
+                continue;
+            }
+
+            if (match(TokenKind::LBracket)) {
+                auto index = parseExpression();
+                const Token bracket = consume(
+                    TokenKind::RBracket,
+                    "expected ']' after array index"
+                );
+
+                auto access = std::make_unique<Expr>();
+                access->kind = ExprKind::ArrayAccess;
+                access->location = { .line = bracket.line, .column = bracket.column };
+                access->left = std::move(target);
+                access->right = std::move(index);
+                target = std::move(access);
+                continue;
+            }
+
+            break;
         }
 
         Stmt statement;

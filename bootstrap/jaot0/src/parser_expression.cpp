@@ -247,15 +247,50 @@ namespace JAOT {
             expression->location = {token.line, token.column};
         } else if (match(TokenKind::KwNew)) {
             const Token &newToken = previous();
-            const Token &className =
-                consume(TokenKind::Identifier, "expected class name after 'new'");
-            consume(TokenKind::LParen, "expected '(' after class name");
-            consume(TokenKind::RParen, "expected ')' after constructor arguments");
+            const ParsedType allocatedType = parseType(false);
 
-            expression = std::make_unique<Expr>();
-            expression->kind = ExprKind::NewObject;
-            expression->className = className.text;
-            expression->location = {newToken.line, newToken.column};
+            if (match(TokenKind::LParen)) {
+                if (allocatedType.type.kind != Type::Reference ||
+                    allocatedType.type.className.empty()) {
+                    error("object allocation requires a class type");
+                    }
+
+                consume(
+                    TokenKind::RParen,
+                    "expected ')' after constructor arguments"
+                );
+
+                expression = std::make_unique<Expr>();
+                expression->kind = ExprKind::NewObject;
+                expression->className = allocatedType.type.className;
+                expression->location = {
+                    .line = newToken.line,
+                    .column = newToken.column
+                };
+            } else if (match(TokenKind::LBracket)) {
+                if (allocatedType.type.kind == Type::Array ||
+                    allocatedType.type.kind == Type::Void) {
+                    error("invalid array element type");
+                    }
+
+                auto length = parseExpression();
+
+                consume(
+                    TokenKind::RBracket,
+                    "expected ']' after array length"
+                );
+
+                expression = std::make_unique<Expr>();
+                expression->kind = ExprKind::NewArray;
+                expression->arrayElementType = allocatedType.type;
+                expression->right = std::move(length);
+                expression->location = {
+                    .line = newToken.line,
+                    .column = newToken.column
+                };
+            } else {
+                error("expected '(' for object allocation or '[' for array allocation");
+            }
         } else if (match(TokenKind::Identifier)) {
             const Token identifier = previous();
 
@@ -323,16 +358,37 @@ namespace JAOT {
             error("expected expression");
         }
 
-        while (match(TokenKind::Dot)) {
-            const Token field =
-                consume(TokenKind::Identifier, "expected field name after '.'");
+        while (true) {
+            if (match(TokenKind::Dot)) {
+                const Token field =
+                    consume(TokenKind::Identifier, "expected field name after '.'");
 
-            auto access = std::make_unique<Expr>();
-            access->kind = ExprKind::FieldAccess;
-            access->name = field.text;
-            access->location = {field.line, field.column};
-            access->left = std::move(expression);
-            expression = std::move(access);
+                auto access = std::make_unique<Expr>();
+                access->kind = ExprKind::FieldAccess;
+                access->name = field.text;
+                access->location = {field.line, field.column};
+                access->left = std::move(expression);
+                expression = std::move(access);
+                continue;
+            }
+
+            if (match(TokenKind::LBracket)) {
+                auto index = parseExpression();
+                const Token bracket = consume(
+                    TokenKind::RBracket,
+                    "expected ']' after array index"
+                );
+
+                auto access = std::make_unique<Expr>();
+                access->kind = ExprKind::ArrayAccess;
+                access->location = {bracket.line, bracket.column};
+                access->left = std::move(expression);
+                access->right = std::move(index);
+                expression = std::move(access);
+                continue;
+            }
+
+            break;
         }
 
         return expression;

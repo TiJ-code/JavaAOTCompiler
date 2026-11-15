@@ -15,7 +15,7 @@ namespace JAOT {
         if (type.kind == Type::Byte) {
             return 1;
         }
-        return type.kind == Type::Reference || type.kind == Type::Long ? 8 : 4;
+        return isReferenceType(type) || type.kind == Type::Long ? 8 : 4;
     }
 
     void FrameLayout::build(const IR::Method &method) {

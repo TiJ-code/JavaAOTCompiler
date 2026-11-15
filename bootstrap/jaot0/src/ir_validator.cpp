@@ -10,6 +10,27 @@ namespace JAOT {
             throw std::runtime_error("invalid IR: " + message);
         }
 
+        std::size_t typeSize(const TypeRef &type) {
+            switch (type.kind) {
+                case Type::Char:
+                case Type::Byte:
+                    return 1;
+                case Type::Short:
+                    return 2;
+                case Type::Int:
+                case Type::Boolean:
+                    return 4;
+                case Type::Long:
+                case Type::Reference:
+                case Type::Array:
+                    return 8;
+                case Type::Void:
+                    invalid("void type has no storage size");
+            }
+
+            invalid("unknown type");
+        }
+
         void validateExpression(
             const IR::Expr &expression,
             const std::unordered_map<IR::LocalId, TypeRef> &locals,
@@ -68,6 +89,42 @@ namespace JAOT {
                     }
                     return;
 
+                case IR::ExprKind::NewArray:
+                    if (expression.type.kind != Type::Array ||
+                        !expression.type.elementType ||
+                        !sameType(
+                            *expression.type.elementType,
+                            expression.elementType
+                        )) {
+                        invalid("array allocation has incorrect type");
+                    }
+
+                    if (!expression.right) {
+                        invalid("array allocation has no length");
+                    }
+
+                    validateExpression(
+                        *expression.right,
+                        locals,
+                        classes,
+                        methods
+                    );
+
+                    if (expression.right->type.kind != Type::Int) {
+                        invalid("array length is not an int");
+                    }
+
+                    if (expression.elementSize != typeSize(expression.elementType)) {
+                        invalid("array allocation has incorrect element size");
+                    }
+
+                    if (expression.elementType.kind == Type::Reference &&
+                        !expression.elementType.className.empty() &&
+                        !classes.contains(expression.elementType.className)) {
+                        invalid("array allocation references unknown class");
+                    }
+                    return;
+
                 case IR::ExprKind::Local: {
                     const auto found = locals.find(expression.local);
 
@@ -116,6 +173,45 @@ namespace JAOT {
 
                     return;
                 }
+
+                case IR::ExprKind::ArrayAccess:
+                    if (!expression.left || !expression.right) {
+                        invalid("array access is incomplete");
+                    }
+
+                    validateExpression(
+                        *expression.left,
+                        locals,
+                        classes,
+                        methods
+                    );
+                    validateExpression(
+                        *expression.right,
+                        locals,
+                        classes,
+                        methods
+                    );
+
+                    if (expression.left->type.kind != Type::Array ||
+                        !expression.left->type.elementType) {
+                        invalid("array access receiver is not an array");
+                    }
+
+                    if (expression.right->type.kind != Type::Int) {
+                        invalid("array index is not an int");
+                    }
+
+                    if (!sameType(
+                            expression.type,
+                            *expression.left->type.elementType
+                        )) {
+                        invalid("array access has incorrect element type");
+                    }
+
+                    if (expression.elementSize != typeSize(expression.type)) {
+                        invalid("array access has incorrect element size");
+                    }
+                    return;
 
                 case IR::ExprKind::Unary: {
                     if (!expression.operand) {
@@ -287,6 +383,21 @@ namespace JAOT {
 
                     if (statement.targetExpression) {
                         validateExpression(*statement.targetExpression, locals, classes, methods);
+                    }
+
+                    if (statement.kind == IR::StatementKind::AssignArray) {
+                        if (!statement.targetExpression ||
+                            statement.targetExpression->kind != IR::ExprKind::ArrayAccess ||
+                            !statement.expression) {
+                            invalid("array assignment is incomplete");
+                        }
+
+                        if (!isAssignable(
+                                statement.expression->type,
+                                statement.targetExpression->type
+                            )) {
+                            invalid("array assignment type does not match");
+                        }
                     }
                 }
             }
